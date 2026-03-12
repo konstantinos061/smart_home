@@ -1,7 +1,5 @@
 # Smart Home IoT Platform Starter
 
-This starter package refactors your weather-ingestion prototype into a LoRa/LoRaWAN-ready backend skeleton.
-
 ## Included
 - FastAPI ingestion and control API
 - Concrete SQLAlchemy models for gateways, nodes, telemetry, events, commands, and alerts
