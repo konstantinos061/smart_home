@@ -75,6 +75,58 @@ curl -X POST http://localhost:8000/api/v1/uplinks \
   }'
 ```
 
+## Simulate a ChirpStack uplink end-to-end
+```bash
+mosquitto_pub -h localhost -p 1883 \
+  -t application/demo-app/device/70B3D57ED0061234/event/up \
+  -m '{
+    "time":"2026-03-12T18:00:00Z",
+    "deviceInfo":{"devEui":"node-living-01"},
+    "rxInfo":[{"rssi":-87,"snr":7.1}],
+    "data":"0A1204FF",
+    "object":{
+      "gatewayId":"gw-home-01",
+      "nodeId":"node-living-01",
+      "frameCounter":15,
+      "seqNo":99,
+      "batteryVoltage":3.72,
+      "batteryPct":61,
+      "lowBattery":false,
+      "measurements":[
+        {"sensorKey":"temperature","type":"analog","value":23.4,"unit":"C"},
+        {"sensorKey":"door_open","type":"digital","value":false}
+      ]
+    }
+  }'
+```
+
+## Test low-battery flow through MQTT
+```bash
+mosquitto_pub -h localhost -p 1883 \
+  -t application/demo-app/device/70B3D57ED0061234/event/up \
+  -m '{
+    "time":"2026-03-12T18:05:00Z",
+    "deviceInfo":{"devEui":"node-living-01"},
+    "rxInfo":[{"rssi":-92,"snr":5.8}],
+    "data":"0A1204AA",
+    "object":{
+      "gatewayId":"gw-home-01",
+      "nodeId":"node-living-01",
+      "frameCounter":16,
+      "seqNo":100,
+      "batteryVoltage":3.31,
+      "batteryPct":18,
+      "lowBattery":true,
+      "measurements":[
+        {"sensorKey":"temperature","type":"analog","value":22.8,"unit":"C"}
+      ]
+    }
+  }'
+```
+
+## Visualize Database
+Visit: http://localhost:8080/
+
 ## ChirpStack integration note
 The included Node-RED flow expects ChirpStack uplinks on MQTT topic:
 `application/+/device/+/event/up`
