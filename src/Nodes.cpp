@@ -200,7 +200,6 @@ void Comms_TaskManager(void * pvParameters){
         }
 
         loraSerial.println("radio rx 0");
-        loraSerial.flush();
 
         //Read ACK
         Serial.println("\n--- Listening for ACK ---");
@@ -248,7 +247,6 @@ void Comms_TaskManager(void * pvParameters){
         }
 
         loraSerial.println("radio rx 0");
-        loraSerial.flush();
         //Read ACK
         Serial.println("\n--- Listening for ACK ---");
         period = xTaskGetTickCount();
@@ -293,7 +291,6 @@ void Comms_TaskManager(void * pvParameters){
         }
 
         loraSerial.println("radio rx 0");
-        loraSerial.flush();
         //Read ACK
         Serial.println("\n--- Listening for ACK ---");
         period = xTaskGetTickCount();
@@ -338,7 +335,6 @@ void Comms_TaskManager(void * pvParameters){
         }
 
         loraSerial.println("radio rx 0");
-        loraSerial.flush();
         //Read ACK
         Serial.println("\n--- Listening for ACK ---");
         period = xTaskGetTickCount();
@@ -383,7 +379,6 @@ void Comms_TaskManager(void * pvParameters){
         }
 
         loraSerial.println("radio rx 0");
-        loraSerial.flush();
         //Read ACK
         Serial.println("\n--- Listening for ACK ---");
         period = xTaskGetTickCount();
