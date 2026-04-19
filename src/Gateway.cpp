@@ -1,122 +1,131 @@
 #include <Arduino.h>
 #include <HardwareSerial.h>
 
+#define RECEPTION_TIME 10000
+#define FRAME_SIZE 60000
+#define RECEVING_WINDOW 5000
+#define GUARD_TIME 500
+#define BEACON_TIME 500
 #define RST 21
 
 String str;
 
 HardwareSerial loraTDMA(2);
 
+struct Node {
+    String devAddr;     
+    int slotTime;       
+};
+
+Node network[] = {
+    {"DOOR_01", 1},    
+    {"TEMP_01", 2},   
+    {"LIGHT_01", 3},
+    {"LIGHT_02", 4},
+    {"LIGHT_03", 5}     
+};
+
+int totalNodes = sizeof(network) / sizeof(network[0]);
 
 TaskHandle_t TDMATaskHandle = NULL;
+TaskHandle_t LoraWANTaskHandle = NULL;
 
+void Send_ACK(TickType_t Starting_time_window){
+
+  Serial.println("Sending ACK!");
+
+  while(loraTDMA.available()) { loraTDMA.read(); } //clear the Lora
+
+  while(xTaskGetTickCount() < (Starting_time_window + pdMS_TO_TICKS(2000))){
+    loraTDMA.println("radio tx 41434B"); //ACK
+
+    str = loraTDMA.readStringUntil('\n');
+    str = loraTDMA.readStringUntil('\n');
+
+    vTaskDelay(100);
+  }
+
+}
 
 
 void TDMA_TaskManager(void * pvParameters){
 
-bool waiting_for_data;
+ 
 
   while(1){
     //First have to send the syncrhonization beacon every 60 seconds and then listen for the health informations
 
-    
-
-    loraTDMA.println("radio tx 53594E435F424541434F4E"); //First send the beacon to everyone beacon = SYNC_BEACON
-    str = loraTDMA.readStringUntil('\n');
-    Serial.println("Lora module confirmed the recption of the instruction to send" + str); //Message stating ok I will start sending 
-
-    str = loraTDMA.readStringUntil('\n');
-    Serial.println("Becon as been sent: " + str); //Message sating I started the actual sending
-
-    //put the radio in rx
-
+    Serial.println("Start Timer");
     TickType_t start_time = xTaskGetTickCount();
 
-    xTaskDelayUntil( &start_time, pdMS_TO_TICKS(4800));
-    //wake up and be ready to ahdnle door data
+    TickType_t through_way_copy;
+    TickType_t period;
+    while (xTaskGetTickCount() < (start_time + pdMS_TO_TICKS(BEACON_TIME)))
+    {
+      loraTDMA.println("radio tx 53594E435F424541434F4E"); //First send the beacon to everyone beacon = SYNC_BEACON
+      str = loraTDMA.readStringUntil('\n');
+      Serial.println("Lora module confirmed the recption of the instruction to send" + str); //Message stating ok I will start sending 
 
-    loraTDMA.println("radio rx 4000");
-    waiting_for_data = true;
-
-    while (waiting_for_data){
-
-      if(loraTDMA.available() > 0){
-        str = loraTDMA.readStringUntil('\n');
-
-        if(str.indexOf("radio_rx") == 0){
-          Serial.println("Received Data from Door: " + str);
-          waiting_for_data = false;
-        }
-        else {
-          Serial.println("Lora Timeout - Nothing received: " + str);
-          waiting_for_data = false;
-          
-        }
-
-      }
-
-      //Do another check in here if it decides to break or something
+      str = loraTDMA.readStringUntil('\n');
+      Serial.println("Becon as been sent: " + str); //Message sating I started the actual sending
+      vTaskDelay(100);
     }
 
-    
-    //then also add here later sednign of an ack and within taht ack ask for the node to wait and transmit to hime some info or not!
+    for (int i = 0; i < totalNodes; i++) {
+        bool received_data = false; 
+        int targetWake = network[i].slotTime * RECEPTION_TIME - GUARD_TIME;
+        
+        
+        through_way_copy = start_time;
+        xTaskDelayUntil(&through_way_copy, pdMS_TO_TICKS(targetWake));
 
+        Serial.printf("Slot %d: Waiting for %s\n", i, network[i].devAddr.c_str());
 
-    xTaskDelayUntil( &start_time, pdMS_TO_TICKS(14800));
+        loraTDMA.println("radio rx 0"); 
+        
+        period = xTaskGetTickCount();
+        while (xTaskGetTickCount() < (period + pdMS_TO_TICKS(3000))){
 
-    loraTDMA.println("radio rx 4000");
-    waiting_for_data = true;
+          if(loraTDMA.available() > 0){
+            str = loraTDMA.readStringUntil('\n');
+            Serial.println("str from lora: " + str);
+            str.trim();
 
-    while (waiting_for_data){
+            if (str.indexOf("radio_rx") == 0) {
+              Serial.println("Success! Data: " + str);
+              received_data = true;
+              break;
+            } 
+            else if (str == "ok") {
+              Serial.println("Module is now listening...");
+            } 
+            else if (str == "radio_err") {
+              Serial.println("Slot Timeout: No signal heard.");
+            }
+            else {
+              // Catch-all for weird garbage
+              Serial.println("Unexpected: " + str);
+            }
 
-      if(loraTDMA.available() > 0){
-        str = loraTDMA.readStringUntil('\n');
+          }
+          vTaskDelay(pdMS_TO_TICKS(5));
 
-        if(str.indexOf("radio_rx") == 0){
-          Serial.println("Received Data from Thermostate: " + str);
-          waiting_for_data = false;
         }
-        else {
-          Serial.println("Lora Timeout - Nothing received: " + str);
-          waiting_for_data = false;
-          
-        }
-
-      }
-
-      //Do another check in here if it decides to break or something
+        xTaskDelayUntil(&period, pdMS_TO_TICKS(3000));
+        period = xTaskGetTickCount();
+        if(received_data){Send_ACK(period);}
+        
     }
     
-
-    xTaskDelayUntil( &start_time, pdMS_TO_TICKS(24800));
-
-    loraTDMA.println("radio rx 4000");
-    waiting_for_data = true;
-
-    //transform this into a single fucntion maybe yheah
-    while (waiting_for_data){
-
-      if(loraTDMA.available() > 0){
-        str = loraTDMA.readStringUntil('\n');
-
-        if(str.indexOf("radio_rx") == 0){
-          Serial.println("Received Data from Garden Light: " + str);
-          waiting_for_data = false;
-        }
-        else {
-          Serial.println("Lora Timeout - Nothing received: " + str);
-          waiting_for_data = false;
-          
-        }
-
-      }
-
-      //Do another check in here if it decides to break or something
-    }
-    
-    xTaskDelayUntil( &start_time, pdMS_TO_TICKS(60000));
+  
+    through_way_copy = start_time;
+    xTaskDelayUntil(&through_way_copy, pdMS_TO_TICKS(FRAME_SIZE));
 
   }
+}
+
+void LoraWAN_TaskManager(void * pvParameters){
+  //Handle LoraWAN communication
 }
 
 
@@ -190,10 +199,6 @@ void setup() {
   str = loraTDMA.readStringUntil('\n');
   Serial.println(str);
   
-  loraTDMA.println("radio set wdt 60000"); //disable for continuous reception
-  str = loraTDMA.readStringUntil('\n');
-  Serial.println(str);
-  
   loraTDMA.println("radio set sync 12");
   str = loraTDMA.readStringUntil('\n');
   Serial.println(str);
@@ -213,8 +218,21 @@ void setup() {
     NULL,              // Parameters
     1,                 // Priority
     &TDMATaskHandle,  // Task handle
-    0                  
+    1                  
   );
+
+   //Create the task!
+  xTaskCreatePinnedToCore(
+    LoraWAN_TaskManager,         // Task function
+    "LoraWAN_TaskManager",       // Task name
+    10000,             // Stack size (bytes)
+    NULL,              // Parameters
+    1,                 // Priority
+    &LoraWANTaskHandle,  // Task handle
+    0                
+  );
+
+
 }
 
 void loop() {
