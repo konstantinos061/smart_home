@@ -3,7 +3,8 @@
 
 #define RECEPTION_TIME 10000
 #define FRAME_SIZE 60000
-#define RECEVING_WINDOW 5000
+#define READING_WINDOW 3000
+#define ACK_WINDOW 2000
 #define GUARD_TIME 500
 #define BEACON_TIME 500
 #define RST 21
@@ -36,7 +37,7 @@ void Send_ACK(TickType_t Starting_time_window){
 
   while(loraTDMA.available()) { loraTDMA.read(); } //clear the Lora
 
-  while(xTaskGetTickCount() < (Starting_time_window + pdMS_TO_TICKS(2000))){
+  while(xTaskGetTickCount() < (Starting_time_window + pdMS_TO_TICKS(ACK_WINDOW))){
     loraTDMA.println("radio tx 41434B"); //ACK
 
     str = loraTDMA.readStringUntil('\n');
@@ -49,7 +50,7 @@ void Send_ACK(TickType_t Starting_time_window){
 
 
 void TDMA_TaskManager(void * pvParameters){
-
+  //TODO::Add something for scanning window 
  
 
   while(1){
@@ -84,7 +85,7 @@ void TDMA_TaskManager(void * pvParameters){
         loraTDMA.println("radio rx 0"); 
         
         period = xTaskGetTickCount();
-        while (xTaskGetTickCount() < (period + pdMS_TO_TICKS(3000))){
+        while (xTaskGetTickCount() < (period + pdMS_TO_TICKS(READING_WINDOW))){
 
           if(loraTDMA.available() > 0){
             str = loraTDMA.readStringUntil('\n');
@@ -111,7 +112,7 @@ void TDMA_TaskManager(void * pvParameters){
           vTaskDelay(pdMS_TO_TICKS(5));
 
         }
-        xTaskDelayUntil(&period, pdMS_TO_TICKS(3000));
+        xTaskDelayUntil(&period, pdMS_TO_TICKS(READING_WINDOW));
         period = xTaskGetTickCount();
         if(received_data){Send_ACK(period);}
         
@@ -123,10 +124,15 @@ void TDMA_TaskManager(void * pvParameters){
 
   }
 }
-
+/*
 void LoraWAN_TaskManager(void * pvParameters){
   //Handle LoraWAN communication
+  //TODO
 }
+  */
+
+//TODO::Add another task for downlink communication and instant actions
+//TODO::Handle teh actual data
 
 
 void setup() {
@@ -221,7 +227,8 @@ void setup() {
     1                  
   );
 
-   //Create the task!
+  /*
+   //LoraWANTask
   xTaskCreatePinnedToCore(
     LoraWAN_TaskManager,         // Task function
     "LoraWAN_TaskManager",       // Task name
@@ -231,6 +238,7 @@ void setup() {
     &LoraWANTaskHandle,  // Task handle
     0                
   );
+  */
 
 
 }
