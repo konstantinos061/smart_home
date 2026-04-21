@@ -3,9 +3,7 @@ from .entities import (
     Alert,
     Command,
     CommandResult,
-    Gateway,
     Node,
-    NodeConfig,
     NodeSensor,
     NodeStatusEvent,
     Telemetry,
@@ -13,10 +11,8 @@ from .entities import (
 
 __all__ = [
     'Base',
-    'Gateway',
     'Node',
     'NodeSensor',
-    'NodeConfig',
     'Telemetry',
     'NodeStatusEvent',
     'Command',

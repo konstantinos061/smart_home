@@ -6,6 +6,15 @@
 - TimescaleDB-backed PostgreSQL setup
 - Mosquitto MQTT broker
 - Node-RED container with a starter uplink-processing flow
+- **React web frontend** for monitoring and control
+
+## Services
+- **API**: FastAPI backend on port 8000
+- **Frontend**: React web UI on port 80
+- **Database**: PostgreSQL with TimescaleDB on port 5433
+- **MQTT Broker**: Mosquitto on port 1883
+- **Node-RED**: Automation platform on port 1880
+- **Adminer**: Database admin interface on port 8080
 
 ## Main API routes
 - `POST /api/v1/gateways`
@@ -21,6 +30,12 @@
 ```bash
 docker compose up --build
 ```
+
+## Access the Application
+- **Web Frontend**: http://localhost/
+- **API Documentation**: http://localhost:8000/docs
+- **Database Admin**: http://localhost:8080/
+- **Node-RED**: http://localhost:1880/
 
 ## Register a gateway
 ```bash
