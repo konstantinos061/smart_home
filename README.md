@@ -1,147 +1,177 @@
-# Smart Home IoT Platform Starter
+# Smart Home IoT Dashboard
 
-## Included
-- FastAPI ingestion and control API
-- Concrete SQLAlchemy models for gateways, nodes, telemetry, events, commands, and alerts
-- TimescaleDB-backed PostgreSQL setup
-- Mosquitto MQTT broker
-- Node-RED container with a starter uplink-processing flow
-- **React web frontend** for monitoring and control
+A modern IoT platform for monitoring and controlling smart home sensors, featuring a real-time React dashboard, FastAPI backend, and TimescaleDB for time-series data.
 
-## Services
-- **API**: FastAPI backend on port 8000
-- **Frontend**: React web UI on port 80
-- **Database**: PostgreSQL with TimescaleDB on port 5433
-- **MQTT Broker**: Mosquitto on port 1883
-- **Node-RED**: Automation platform on port 1880
-- **Adminer**: Database admin interface on port 8080
+## Features
 
-## Main API routes
-- `POST /api/v1/gateways`
-- `POST /api/v1/nodes`
-- `POST /api/v1/uplinks`
-- `POST /api/v1/status`
-- `GET /api/v1/telemetry`
-- `GET /api/v1/nodes/{node_id}/latest`
-- `POST /api/v1/nodes/{node_id}/commands`
-- `GET /api/v1/health`
+- **Real-time Sensor Monitoring**: Live dashboard with sensor cards for thermostats, door sensors, and pet detectors
+- **Interactive Controls**: Adjust thermostat set temperatures with precision controls
+- **Historical Data Visualization**: View sensor history with interactive charts using Recharts
+- **Battery & Signal Monitoring**: Track device battery levels and RSSI for all sensors
+- **RESTful API**: FastAPI backend for data ingestion and management
+- **Time-Series Database**: PostgreSQL with TimescaleDB for efficient telemetry storage
+- **Docker Deployment**: Complete containerized setup with Docker Compose
+- **Dummy Data Generation**: Python script for populating test data
 
-## Start
+## Architecture
+
+### Backend (FastAPI)
+- REST API for node management, telemetry ingestion, and commands
+- Pydantic models for data validation
+- SQLAlchemy ORM with TimescaleDB for time-series queries
+- Automatic API documentation at `/docs`
+
+### Frontend (React + TypeScript)
+- Responsive dashboard with sensor components
+- Real-time data fetching with Axios
+- Interactive charts for historical data
+- Modular component architecture
+
+### Database (PostgreSQL + TimescaleDB)
+- Time-series optimized storage for sensor telemetry
+- Relational data for nodes and sensors
+- Adminer web interface for database management
+
+## Quick Start
+
+### Prerequisites
+- Docker and Docker Compose
+- Python 3.10+ (for dummy data script)
+
+### Run the Application
 ```bash
+# Clone the repository
+git clone <repository-url>
+cd smart_home
+
+# Start all services
 docker compose up --build
 ```
 
-## Access the Application
-- **Web Frontend**: http://localhost/
+### Access Points
+- **Dashboard**: http://localhost
 - **API Documentation**: http://localhost:8000/docs
-- **Database Admin**: http://localhost:8080/
-- **Node-RED**: http://localhost:1880/
+- **Database Admin**: http://localhost:8080
+- **Node-RED**: http://localhost:1880
 
-## Register a gateway
+### Add Test Data
 ```bash
-curl -X POST http://localhost:8000/api/v1/gateways \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "gatewayId": "gw-home-01",
-    "name": "Home Gateway 01",
-    "lorawanDevEui": "70B3D57ED0061234"
-  }'
+# Populate with sample nodes and telemetry
+python dummy-data.py
 ```
 
-## Register a node
+## Dashboard Overview
+
+The React frontend provides a comprehensive view of your smart home sensors:
+
+### Sensor Cards
+Each sensor displays:
+- **Node Name**: Identifies the physical location
+- **Current Readings**: Temperature, humidity, status, etc.
+- **Battery Level**: Visual indicator with percentage
+- **RSSI**: Signal strength indicator
+- **History Button**: Opens modal with historical charts
+
+### Thermostat Controls
+- View current temperature and humidity
+- Adjust set temperature with +/- buttons (0.1°C precision)
+- Set temperature initializes from API data
+
+### History Modals
+- Interactive line charts for sensor data
+- Dual-axis charts for temperature/humidity
+- Time-based data visualization
+- Sensor-specific chart types
+
+## API Reference
+
+### Core Endpoints
+- `GET /api/v1/node/latest` - Get all nodes with latest telemetry
+- `POST /api/v1/uplink` - Ingest sensor data
+- `GET /api/v1/telemetry` - Query historical data
+- `POST /api/v1/node` - Register new nodes
+
+### Example: Get Latest Data
 ```bash
-curl -X POST http://localhost:8000/api/v1/nodes \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "nodeId": "node-living-01",
-    "gatewayId": "gw-home-01",
-    "name": "Living Room Node",
-    "nodeType": "sensor",
-    "batteryType": "liion",
-    "sleepProfile": "deep-sleep-5m",
-    "reportIntervalSec": 300
-  }'
+curl http://localhost:8000/api/v1/node/latest
 ```
 
-## Example uplink
+### Example: Send Telemetry
 ```bash
-curl -X POST http://localhost:8000/api/v1/uplinks \
+curl -X POST http://localhost:8000/api/v1/uplink \
   -H 'Content-Type: application/json' \
   -d '{
-    "gatewayId": "gw-home-01",
-    "nodeId": "node-living-01",
-    "timestamp": "2026-03-12T12:30:00Z",
-    "frameCounter": 12,
-    "seqNo": 44,
-    "rssi": -89,
-    "snr": 7.2,
-    "battery": {
-      "voltage": 3.71,
-      "percentage": 64,
-      "lowBattery": false
-    },
+    "nodeId": "living-room",
     "measurements": [
-      {"sensorKey": "temperature", "type": "analog", "value": 22.9, "unit": "C"},
-      {"sensorKey": "door_open", "type": "digital", "value": false}
-    ],
-    "rawPayloadHex": "0A1204FF"
+      {
+        "sensorId": 1,
+        "sensorType": "thermostat",
+        "key": "temperature",
+        "value": 22.5,
+        "batteryPct": 85
+      }
+    ]
   }'
 ```
 
-## Simulate a ChirpStack uplink end-to-end
+## Development
+
+### Backend Setup
 ```bash
-mosquitto_pub -h localhost -p 1883 \
-  -t application/demo-app/device/70B3D57ED0061234/event/up \
-  -m '{
-    "time":"2026-03-12T18:00:00Z",
-    "deviceInfo":{"devEui":"node-living-01"},
-    "rxInfo":[{"rssi":-87,"snr":7.1}],
-    "data":"0A1204FF",
-    "object":{
-      "gatewayId":"gw-home-01",
-      "nodeId":"node-living-01",
-      "frameCounter":15,
-      "seqNo":99,
-      "batteryVoltage":3.72,
-      "batteryPct":61,
-      "lowBattery":false,
-      "measurements":[
-        {"sensorKey":"temperature","type":"analog","value":23.4,"unit":"C"},
-        {"sensorKey":"door_open","type":"digital","value":false}
-      ]
-    }
-  }'
+cd app
+pip install -r ../requirements.txt
+uvicorn main:app --reload
 ```
 
-## Test low-battery flow through MQTT
+### Frontend Setup
 ```bash
-mosquitto_pub -h localhost -p 1883 \
-  -t application/demo-app/device/70B3D57ED0061234/event/up \
-  -m '{
-    "time":"2026-03-12T18:05:00Z",
-    "deviceInfo":{"devEui":"node-living-01"},
-    "rxInfo":[{"rssi":-92,"snr":5.8}],
-    "data":"0A1204AA",
-    "object":{
-      "gatewayId":"gw-home-01",
-      "nodeId":"node-living-01",
-      "frameCounter":16,
-      "seqNo":100,
-      "batteryVoltage":3.31,
-      "batteryPct":18,
-      "lowBattery":true,
-      "measurements":[
-        {"sensorKey":"temperature","type":"analog","value":22.8,"unit":"C"}
-      ]
-    }
-  }'
+cd frontend
+npm install
+npm run dev
 ```
 
-## Visualize Database
-Visit: http://localhost:8080/
+### Database Access
+- Host: localhost:5433
+- User: postgres
+- Password: postgres
+- Database: postgres
 
-## ChirpStack integration note
-The included Node-RED flow expects ChirpStack uplinks on MQTT topic:
-`application/+/device/+/event/up`
+## Project Structure
 
-It maps `msg.payload.object` into the backend `UplinkPayload` shape. You will usually customize that mapping once your exact gateway decoder format is fixed.
+```
+smart_home/
+├── app/                    # FastAPI backend
+│   ├── api/
+│   ├── models/
+│   ├── schemas/
+│   └── services/
+├── frontend/               # React dashboard
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   └── services/
+│   └── package.json
+├── docker-compose.yml      # Container orchestration
+├── dummy-data.py          # Test data generator
+└── README.md
+```
+
+## Technologies Used
+
+- **Backend**: FastAPI 0.115.0, SQLAlchemy 2.0.35, Pydantic 2.9.2
+- **Frontend**: React 19.2.5, TypeScript 6.0.2, Recharts 3.8.1
+- **Database**: PostgreSQL 16, TimescaleDB
+- **Infrastructure**: Docker, Docker Compose
+- **Tools**: Adminer, Node-RED, Mosquitto MQTT
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test with dummy data
+5. Submit a pull request
+
+## License
+
+MIT License - see LICENSE file for details
