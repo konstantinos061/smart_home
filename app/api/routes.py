@@ -170,7 +170,7 @@ def ingest_uplink(payload: UplinkPayload, db: Session = Depends(get_db)):
             sensor = NodeSensor(
                 id=measurement.sensorId,
                 node_id=payload.nodeId,
-                name=f'Sensor {measurement.sensorId}',
+                name=f'Sensor #{measurement.sensorId}/{measurement.sensorType}',
                 type=measurement.sensorType,  # FIXED: Changed from sensor_type to type
             )
             db.add(sensor)
