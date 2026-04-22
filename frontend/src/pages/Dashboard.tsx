@@ -34,8 +34,8 @@ export function Dashboard() {
   }, []);
 
   const summary = useMemo(() => {
-    // Map strictly holds the single latest Telemetry object
-    const sensorsByType = new Map<string, Map<number, Telemetry>>();
+    // Map holds arrays of Telemetry objects for each sensor
+    const sensorsByType = new Map<string, Map<number, Telemetry[]>>();
 
     nodes.forEach((node) => {
       if (!node.latestTelemetry) return;
@@ -45,8 +45,12 @@ export function Dashboard() {
           sensorsByType.set(latestItem.sensorType, new Map());
         }
         
-        // Store ONLY the absolute latest reading
-        sensorsByType.get(latestItem.sensorType)!.set(latestItem.sensorId, latestItem);
+        if (!sensorsByType.get(latestItem.sensorType)!.has(latestItem.sensorId)) {
+          sensorsByType.get(latestItem.sensorType)!.set(latestItem.sensorId, []);
+        }
+        
+        // Add all readings for this sensor
+        sensorsByType.get(latestItem.sensorType)!.get(latestItem.sensorId)!.push(latestItem);
       });
     });
 
@@ -121,36 +125,38 @@ export function Dashboard() {
 
           {sensorsMap.size > 0 ? (
             <div className="sensors-grid">
-              {Array.from(sensorsMap.entries()).map(([sensorId, latestData]) => {
+              {Array.from(sensorsMap.entries()).map(([sensorId, sensorData]) => {
                 
-                const sensorNodeId = latestData.nodeId;
-                const sensorName = latestData.sensorName || `Sensor #${sensorId}`;
+                const sensorNodeId = sensorData[0].nodeId;
+                const node = nodes.find(n => n.nodeId === sensorNodeId);
+                const sensorName = sensorData[0].sensorName || `Sensor #${sensorId}`;
+                const nodeName = node?.nodeName || sensorNodeId;
                 
-                // Assuming your components map over an array, we pass it an array of exactly length 1
-                const strictLatestData = [latestData];
-
                 return (
                   <div key={`${sensorType}-${sensorId}`}>
                     {sensorType === 'door' && (
                       <DoorSensor
                         sensorName={sensorName}
-                        nodeId={sensorNodeId}
-                        data={strictLatestData}
+                        nodeName={nodeName}
+                        sensorId={sensorId}
+                        data={sensorData}
                       />
                     )}
                     {sensorType === 'thermostat' && (
                       <ThermostatSensor
                         sensorName={sensorName}
-                        nodeId={sensorNodeId}
-                        data={strictLatestData}
+                        nodeName={nodeName}
+                        sensorId={sensorId}
+                        data={sensorData}
                       />
                     )}
                     {sensorType === 'pet' && (
                       <PetSensor
                         sensorName={sensorName}
                         nodeId={sensorNodeId}
+                        nodeName={nodeName}
                         sensorId={sensorId}       // <-- Added to allow history fetching
-                        latestData={latestData}   // <-- Passed just the single object
+                        latestData={sensorData[0]}   // <-- Passed the first (and likely only) object
                       />
                     )}
                   </div>
