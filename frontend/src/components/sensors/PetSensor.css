@@ -24,6 +24,26 @@
   gap: 12px;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-button {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background 0.2s;
+}
+
+.history-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 .pet-sensor-header h3 {
   margin: 0;
   font-size: 18px;
@@ -149,29 +169,77 @@
   gap: 8px;
 }
 
+.battery-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
 .battery-indicator .label {
-  font-size: 11px;
-  opacity: 0.8;
+  font-size: 12px;
+  opacity: 0.9;
   text-transform: uppercase;
-  min-width: 55px;
-  color: #cbd5e1
+  letter-spacing: 0.5px;
+  color: aliceblue;
 }
 
 .battery-bar {
-  flex: 1;
-  height: 6px;
-  background: rgba(237, 231, 231, 0.2);
-  border-radius: 3px;
+  width: 60px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
   overflow: hidden;
 }
 
 .battery-fill {
   height: 100%;
-  border-radius: 3px;
-  transition: width 0.3s ease;
+  border-radius: 6px;
+  transition: width 0.3s;
 }
 
 .battery-indicator .value {
+  font-size: 12px;
+  font-weight: 600;
+  color: aliceblue;
+}
+
+.sensor-indicators {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+  justify-content: space-around;
+}
+
+.rssi-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.rssi-indicator .label {
+  font-size: 11px;
+  opacity: 0.8;
+  text-transform: uppercase;
+  min-width: 55px;
+  color: #cbd5e1;
+}
+
+.antenna {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 20px;
+}
+
+.antenna-bar {
+  width: 4px;
+  border-radius: 2px;
+  transition: background-color 0.3s;
+}
+
+.rssi-indicator .value {
   font-size: 11px;
   font-weight: 600;
   min-width: 35px;

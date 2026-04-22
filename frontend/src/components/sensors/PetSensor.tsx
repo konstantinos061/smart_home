@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react';
 import { getTelemetry, type Telemetry } from '../../services/api';
+import { HistoryModal } from '../HistoryModal';
 import './PetSensor.css';
 
 interface PetSensorProps {
   sensorName: string;
   nodeId: string;
+  nodeName: string;
   sensorId: number;
   latestData: Telemetry;
 }
 
-export function PetSensor({ sensorName, nodeId, sensorId, latestData }: PetSensorProps) {
+export function PetSensor({ sensorName, nodeId, nodeName, sensorId, latestData }: PetSensorProps) {
   const [lastDetectionTime, setLastDetectionTime] = useState<Date | null>(null);
   const [isFetchingHistory, setIsFetchingHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   // 1. The absolute newest ping from the sensor (for battery and hardware health)
   const lastSensorPingTime = latestData?.time ? new Date(latestData.time) : null;
@@ -73,63 +76,100 @@ export function PetSensor({ sensorName, nodeId, sensorId, latestData }: PetSenso
     return `${Math.floor(seconds / 86400)}d ago`;
   }
 
+  const rssi = latestData?.rssi ?? null;
+
+  const getRssiLevel = (rssi: number | null) => {
+    if (rssi === null) return { level: 0, color: 'gray', label: 'Unknown' };
+    if (rssi >= -60) return { level: 3, color: 'green', label: 'Excellent' };
+    if (rssi >= -80) return { level: 2, color: 'orange', label: 'Moderate' };
+    return { level: 1, color: 'red', label: 'Poor' };
+  };
+
+  const rssiInfo = getRssiLevel(rssi);
+
   return (
-    <div className="pet-sensor-card">
-      <div className="pet-sensor-header">
-        <h3>{sensorName}</h3>
-        <span className="node-badge">{nodeId}</span>
-      </div>
-
-      <div className="pet-sensor-content">
-        <div className="pet-status-display">
-          <div className={`pet-icon ${isPresent ? 'present' : 'absent'}`}>
-            {isPresent ? '🐾' : '👁️'}
+    <>
+      <div className="pet-sensor-card">
+        <div className="pet-sensor-header">
+          <h3>{sensorName}</h3>
+          <div className="header-actions">
+            <button className="history-button" onClick={() => setShowHistory(true)}>📊</button>
+            <span className="node-badge">{nodeName}</span>
           </div>
-          <div className="pet-status-text">
-            <div className="status-label">Current Status</div>
-            <div className={`status-value ${isPresent ? 'present' : 'absent'}`}>
-              {isPresent ? 'Present' : 'Absent'}
+        </div>
+
+        <div className="pet-sensor-content">
+          <div className="pet-status-display">
+            <div className={`pet-icon ${isPresent ? 'present' : 'absent'}`}>
+              {isPresent ? '🐾' : '👁️'}
             </div>
-          </div>
-        </div>
-
-        <div className="pet-info">
-          <div className="info-item">
-            <span className="info-label">Sensor Last Ping</span>
-            <span className="info-value">{sensorTimeAgo}</span>
-          </div>
-          
-          <div className="info-item">
-            <span className="info-label">Pet Last Detected</span>
-            <span className="info-value">
-              {isFetchingHistory 
-                ? 'Searching history...' 
-                : lastDetectionTime 
-                  ? `${lastDetectionTime.toLocaleTimeString()} (${detectionTimeAgo})` 
-                  : 'No history'
-              }
-            </span>
-          </div>
-        </div>
-
-        <div className="pet-battery-info">
-          {latestData?.batteryPct !== undefined && latestData?.batteryPct !== null && (
-            <div className="battery-indicator">
-              <span className="label">Battery</span>
-              <div className="battery-bar">
-                <div
-                  className="battery-fill"
-                  style={{
-                    width: `${latestData.batteryPct}%`,
-                    backgroundColor: latestData.batteryPct > 20 ? '#4CAF50' : '#FF5722'
-                  }}
-                ></div>
+            <div className="pet-status-text">
+              <div className="status-label">Current Status</div>
+              <div className={`status-value ${isPresent ? 'present' : 'absent'}`}>
+                {isPresent ? 'Present' : 'Absent'}
               </div>
-              <span className="value">{latestData.batteryPct}%</span>
             </div>
-          )}
+          </div>
+
+          <div className="pet-info">
+            <div className="info-item">
+              <span className="info-label">Sensor Last Ping</span>
+              <span className="info-value">{sensorTimeAgo}</span>
+            </div>
+            
+            <div className="info-item">
+              <span className="info-label">Pet Last Detected</span>
+              <span className="info-value">
+                {isFetchingHistory 
+                  ? 'Searching history...' 
+                  : lastDetectionTime 
+                    ? `${lastDetectionTime.toLocaleTimeString()} (${detectionTimeAgo})` 
+                    : 'No history'
+                }
+              </span>
+            </div>
+          </div>
+
+          <div className="sensor-indicators">
+            {latestData?.batteryPct !== undefined && latestData?.batteryPct !== null && (
+              <div className="battery-indicator">
+                <span className="label">Battery</span>
+                <div className="battery-bar">
+                  <div
+                    className="battery-fill"
+                    style={{
+                      width: `${latestData.batteryPct}%`,
+                      backgroundColor: latestData.batteryPct > 20 ? '#4CAF50' : '#FF5722'
+                    }}
+                  ></div>
+                </div>
+                <span className="value">{latestData.batteryPct}%</span>
+              </div>
+            )}
+
+            {rssi !== null && (
+              <div className="rssi-indicator">
+                <span className="label">Signal</span>
+                <div className="antenna">
+                  <div className="antenna-bar" style={{ height: '10px', backgroundColor: rssiInfo.level >= 1 ? rssiInfo.color : 'gray' }}></div>
+                  <div className="antenna-bar" style={{ height: '15px', backgroundColor: rssiInfo.level >= 2 ? rssiInfo.color : 'gray' }}></div>
+                  <div className="antenna-bar" style={{ height: '20px', backgroundColor: rssiInfo.level >= 3 ? rssiInfo.color : 'gray' }}></div>
+                </div>
+                <span className="value">{rssiInfo.label}</span>
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
-    </div>
+      <HistoryModal
+        isOpen={showHistory}
+        onClose={() => setShowHistory(false)}
+        nodeId={nodeId}
+        sensorId={sensorId}
+        sensorType="pet"
+        sensorName={sensorName}
+      />
+    </>
   );
 }
