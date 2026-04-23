@@ -2,7 +2,7 @@
 
 #define  NODE_ID 0
 #define NEW_BEACON 595000
-uint8_t trans_slot = (NODE_ID * 10000) + 10000;
+int trans_slot = (NODE_ID * 10000) + 10000;
 
 // TDMA configuration
 #define BEACON_INTERVAL_MS   60000
@@ -22,7 +22,7 @@ uint8_t trans_slot = (NODE_ID * 10000) + 10000;
 #define LORA_TX   17
 #define LORA_RX   16
 #define LORA_RST  21
-#define LORA_FREQ "869100000"
+#define LORA_FREQ "868100000"
 #define LORA_SF   "sf7"
 #define LORA_BW   "125"
 #define LORA_CR   "4/5"
