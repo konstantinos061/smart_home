@@ -24,7 +24,8 @@ from app.schemas import (
     StatusEventPayload,
     StatusResponse,
     TelemetryResponse,
-    LatestTelemetryResponse,
+    SensorsResponse,
+    SensorCreatePayload,
     UplinkPayload,
 )
 
@@ -267,6 +268,72 @@ def rename_sensor(sensor_id: int, payload: SensorNamePayload, db: Session = Depe
         raise HTTPException(status_code=404, detail='Sensor not found')
 
     sensor.name = payload.name
+    db.commit()
+    return {'status': 'ok'}
+
+
+@router.get('/sensors', response_model=list[SensorsResponse])
+def get_sensors(
+    nodeId: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    stmt = select(
+        NodeSensor.id.label("sensor_id"),
+        NodeSensor.node_id.label("node_id"),
+        NodeSensor.name.label("sensor_name"),
+        NodeSensor.type.label("sensor_type"),
+        NodeSensor.battery_pct.label("battery_pct"),
+        NodeSensor.is_active.label("is_active")
+    )
+
+    if nodeId:
+        stmt = stmt.where(NodeSensor.node_id == nodeId)
+
+    rows = db.execute(stmt).all()
+
+    return [
+        {
+            'sensorId': s_id,
+            'nodeId': n_id,
+            'sensorName': s_name,
+            'sensorType': s_type,
+            'batteryPct': b_pct,
+            'isActive': is_active
+        }
+        for s_id, n_id, s_name, s_type, b_pct, is_active in rows
+    ]
+
+
+@router.post('/sensors', response_model=StatusResponse)
+def create_sensor(payload: SensorCreatePayload, db: Session = Depends(get_db)):
+    # the type is based on the first 2 bits of the id, 00->thermostat, 01->door, 10->pet
+    type_map = {
+        0b00: 'thermostat',
+        0b01: 'door',
+        0b10: 'pet',
+    }
+    
+    # Extract the first 2 bits of the id to determine the type
+    sensor_type = type_map.get((payload.id >> 6) & 0b11, 'unknown')  # Default to 'unknown' if it doesn't match
+    
+    sensor = NodeSensor(
+        id=payload.id,
+        name=payload.name if payload.name else f'Sensor #{payload.id}',
+        type=sensor_type
+    )
+    db.add(sensor)
+    db.commit()
+    return {'status': 'ok'}
+
+
+@router.post('sensors/{sensor_id}/delete', response_model=StatusResponse)
+def delete_sensor(sensor_id: int, db: Session = Depends(get_db)):
+    sensor = db.get(NodeSensor, sensor_id)
+    if not sensor:
+        raise HTTPException(status_code=404, detail='Sensor not found')
+    db.delete(sensor)
+    # delete all telemetry related to that sensor
+    db.query(Telemetry).filter(Telemetry.sensor_id == sensor_id).delete()
     db.commit()
     return {'status': 'ok'}
 
