@@ -85,6 +85,7 @@ class TelemetryResponse(BaseModel):
 
 class LatestTelemetryResponse(BaseModel):
     time: datetime
+    nodeId: str
     sensorId: int
     sensorName: Optional[str] = None
     sensorType: str

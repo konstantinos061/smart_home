@@ -38,8 +38,8 @@ export function HistoryModal({ isOpen, onClose, nodeId, sensorId, sensorType, se
 
   const prepareChartData = () => {
     if (sensorType === 'thermostat') {
-      // Group by time, collect temp and humidity
-      const timeMap = new Map<string, { time: string, temperature?: number, humidity?: number }>();
+      // Group by time, collect temp, humidity, and setTemperature
+      const timeMap = new Map<string, { time: string, temperature?: number, humidity?: number, setTemperature?: number }>();
       history.forEach(item => {
         const timeKey = new Date(item.time).toLocaleTimeString();
         if (!timeMap.has(timeKey)) {
@@ -48,6 +48,7 @@ export function HistoryModal({ isOpen, onClose, nodeId, sensorId, sensorType, se
         const entry = timeMap.get(timeKey)!;
         if (item.key === 'temperature') entry.temperature = item.valueNumeric;
         if (item.key === 'humidity') entry.humidity = item.valueNumeric;
+        if (item.key === 'setTemperature') entry.setTemperature = item.valueNumeric;
       });
       return Array.from(timeMap.values());
     } else {
@@ -84,6 +85,7 @@ export function HistoryModal({ isOpen, onClose, nodeId, sensorId, sensorType, se
                   <>
                     <Line type="monotone" dataKey="temperature" stroke="#8884d8" name="Temperature (°C)" />
                     <Line type="monotone" dataKey="humidity" stroke="#82ca9d" name="Humidity (%)" />
+                    <Line type="monotone" dataKey="setTemperature" stroke="#ff7300" name="Set Temperature (°C)" />
                   </>
                 ) : (
                   <Line type="monotone" dataKey="value" stroke="#8884d8" name="Value" />

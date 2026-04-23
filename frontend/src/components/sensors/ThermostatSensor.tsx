@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Telemetry } from '../../services/api';
 import { HistoryModal } from '../HistoryModal';
 import './ThermostatSensor.css';
@@ -11,16 +11,23 @@ interface ThermostatSensorProps {
 }
 
 export function ThermostatSensor({ sensorName, nodeName, sensorId, data }: ThermostatSensorProps) {
-  // Find set temperature from API data
   const setTempData = data
     .filter(d => d.key === 'setTemperature')
     .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
-  
-  const initialSetTemp = setTempData?.valueNumeric ?? 22;
-  
-  const [setTemp, setSetTemp] = useState<number>(initialSetTemp);
+
+  const [setTemp, setSetTemp] = useState<number>(22);
   const [showHistory, setShowHistory] = useState(false);
-    console.log('ThermostatSensor data:', data);
+
+  useEffect(() => {
+    if (setTempData?.valueNumeric != null) {
+      setSetTemp(setTempData.valueNumeric);
+      return;
+    }
+
+    if (data.length > 0) {
+      setSetTemp(22);
+    }
+  }, [setTempData?.valueNumeric, data.length]);
   // Find latest temperature and humidity readings
   const tempData = data
     .filter(d => d.key === 'temperature')

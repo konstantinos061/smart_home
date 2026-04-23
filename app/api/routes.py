@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.util import defaultdict
 
@@ -88,21 +88,36 @@ def get_all_nodes_latest(db: Session = Depends(get_db)):
     # Map events into a dictionary keyed by node_id for instant O(1) lookup
     events_by_node = {event.node_id: event for event in latest_events}
 
-    # 3. Fetch the latest telemetry for EVERY node and sensor using DISTINCT ON
+    # 3. Fetch the latest telemetry for EVERY node, sensor, and measurement key using a window function
+    latest_telemetry_subq = (
+        select(
+            Telemetry.node_id.label('node_id'),
+            Telemetry.sensor_id.label('sensor_id'),
+            Telemetry.measurement_key.label('measurement_key'),
+            Telemetry.time.label('time'),
+            Telemetry.unit.label('unit'),
+            Telemetry.value_numeric.label('value_numeric'),
+            Telemetry.value_text.label('value_text'),
+            Telemetry.value_bool.label('value_bool'),
+            Telemetry.rssi.label('rssi'),
+            Telemetry.snr.label('snr'),
+            Telemetry.battery_pct.label('battery_pct'),
+            func.row_number().over(
+                partition_by=(Telemetry.node_id, Telemetry.sensor_id, Telemetry.measurement_key),
+                order_by=Telemetry.time.desc()
+            ).label('row_number')
+        )
+        .subquery()
+    )
+
     telemetry_rows = db.execute(
         select(
-            Telemetry, 
-            NodeSensor.name.label("sensor_name"),
-            NodeSensor.type.label("sensor_type") 
+            latest_telemetry_subq,
+            NodeSensor.name.label('sensor_name'),
+            NodeSensor.type.label('sensor_type')
         )
-        .join(NodeSensor, Telemetry.sensor_id == NodeSensor.id)
-        .distinct(Telemetry.node_id, Telemetry.sensor_id, Telemetry.measurement_key)
-        .order_by(
-            Telemetry.node_id,
-            Telemetry.sensor_id, 
-            Telemetry.measurement_key, 
-            Telemetry.time.desc()
-        )
+        .join(NodeSensor, latest_telemetry_subq.c.sensor_id == NodeSensor.id)
+        .where(latest_telemetry_subq.c.row_number == 1)
     ).all()
 
     # Group telemetry rows into a dictionary keyed by node_id
@@ -111,22 +126,25 @@ def get_all_nodes_latest(db: Session = Depends(get_db)):
     # Create a quick lookup for node names so we can inject them into the telemetry
     node_names = {node.node_id: node.name for node in nodes}
 
-    for t_obj, s_name, s_type in telemetry_rows:
-        telemetry_by_node[t_obj.node_id].append({
-            'time': t_obj.time,
-            'nodeId': t_obj.node_id,
-            'nodeName': node_names.get(t_obj.node_id), # <-- Added to satisfy Pydantic schema
-            'sensorId': t_obj.sensor_id,
+    for row in telemetry_rows:
+        # Unpack: subquery columns (13 total) + sensor_name + sensor_type
+        node_id, sensor_id, measurement_key, time, unit, value_numeric, value_text, value_bool, rssi, snr, battery_pct, row_number, s_name, s_type = row
+        
+        telemetry_by_node[node_id].append({
+            'time': time,
+            'nodeId': node_id,
+            'nodeName': node_names.get(node_id),
+            'sensorId': sensor_id,
             'sensorName': s_name,     
             'sensorType': s_type,     
-            'key': t_obj.measurement_key,
-            'unit': t_obj.unit,
-            'valueNumeric': t_obj.value_numeric,
-            'valueText': t_obj.value_text,
-            'valueBool': t_obj.value_bool,
-            'rssi': t_obj.rssi,               
-            'snr': t_obj.snr,                 
-            'batteryPct': t_obj.battery_pct,
+            'key': measurement_key,
+            'unit': unit,
+            'valueNumeric': value_numeric,
+            'valueText': value_text,
+            'valueBool': value_bool,
+            'rssi': rssi,               
+            'snr': snr,                 
+            'batteryPct': battery_pct,
         })
 
     # 4. Assemble the final response
