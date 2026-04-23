@@ -1,5 +1,9 @@
 #include <Arduino.h>
 
+#define  NODE_ID 0
+#define NEW_BEACON 595000
+uint8_t trans_slot = (NODE_ID * 10000) + 10000;
+
 // TDMA configuration
 #define BEACON_INTERVAL_MS   60000
 #define WINDOW_1_OFFSET_MS   5000
@@ -26,8 +30,8 @@
 #define LORA_PWR  "14"
 #define LORA_SYNC "12"
 
-#define TX_WINDOW 3000
-#define ACK_WINDOW 2000
+#define TX_WINDOW 2000
+#define ACK_WINDOW 1000
 
 //TODO::Add the logic just for the specific sensor and also the constant reading on other frequency - maybe a lower priority task!!
 
@@ -183,7 +187,7 @@ void Comms_TaskManager(void * pvParameters){
         }
         TickType_t start_time = xTaskGetTickCount();
         through_way_copy = start_time;
-        xTaskDelayUntil(&through_way_copy, pdMS_TO_TICKS(10000));
+        xTaskDelayUntil(&through_way_copy, pdMS_TO_TICKS(trans_slot));
 
         Serial.println("\n--- Handling windows ---");
 
@@ -229,185 +233,9 @@ void Comms_TaskManager(void * pvParameters){
             }
             vTaskDelay(5);
         }
+        through_way_copy = start_time;
+        xTaskDelayUntil(&through_way_copy, pdMS_TO_TICKS(NEW_BEACON));
 
-
-        
-        vTaskDelay(5000);
-
-        
-        Serial.println("\n--- Second Sending window ---");
-        period = xTaskGetTickCount();
-        while(millis() < period + TX_WINDOW) {
-            
-            loraSerial.println("radio tx AAAAAAAAAA");
-            loraSerial.readStringUntil('\n');
-            loraSerial.readStringUntil('\n');
-
-            vTaskDelay(10);
-        }
-
-        loraSerial.println("radio rx 0");
-        //Read ACK
-        Serial.println("\n--- Listening for ACK ---");
-        period = xTaskGetTickCount();
-        while(millis() < period + ACK_WINDOW) {
-
-            
-            if(loraSerial.available() > 0){
-                String str = loraSerial.readStringUntil('\n');
-                Serial.println("str from lora: " + str);
-                str.trim();
-
-                if (str.indexOf("radio_rx") == 0) {
-                Serial.println("Success! ACK receives: " + str);
-                
-                } 
-                else if (str == "ok") {
-                Serial.println("Module is now listening...");
-                } 
-                else if (str == "radio_err") {
-                Serial.println("Slot Timeout: No signal heard.");
-                }
-                else {
-                // Catch-all for weird garbage
-                Serial.println("Unexpected: " + str);
-                }
-
-            }
-            vTaskDelay(5);
-        }
-
-        vTaskDelay(5000);
-
-        Serial.println("\n--- Third Sending window ---");
-        period = xTaskGetTickCount();
-        while(millis() < period + TX_WINDOW) {
-            
-            loraSerial.println("radio tx AAAAAAAAAA");
-            loraSerial.readStringUntil('\n');
-            loraSerial.readStringUntil('\n');
-
-            vTaskDelay(10);
-        }
-
-        loraSerial.println("radio rx 0");
-        //Read ACK
-        Serial.println("\n--- Listening for ACK ---");
-        period = xTaskGetTickCount();
-        while(millis() < period + ACK_WINDOW) {
-
-            
-            if(loraSerial.available() > 0){
-                String str = loraSerial.readStringUntil('\n');
-                Serial.println("str from lora: " + str);
-                str.trim();
-
-                if (str.indexOf("radio_rx") == 0) {
-                Serial.println("Success! ACK receives: " + str);
-                } 
-                else if (str == "ok") {
-                Serial.println("Module is now listening...");
-                } 
-                else if (str == "radio_err") {
-                Serial.println("Slot Timeout: No signal heard.");
-                }
-                else {
-                // Catch-all for weird garbage
-                Serial.println("Unexpected: " + str);
-                }
-
-            }
-            vTaskDelay(5);
-        }
-
-        delay(5000);
-
-
-        Serial.println("\n--- Fourth Sending window ---");
-        period = xTaskGetTickCount();
-        while(millis() < period + TX_WINDOW) {
-            
-            loraSerial.println("radio tx AAAAAAAAAA");
-            loraSerial.readStringUntil('\n');
-            loraSerial.readStringUntil('\n');
-
-            vTaskDelay(10);
-        }
-
-        loraSerial.println("radio rx 0");
-        //Read ACK
-        Serial.println("\n--- Listening for ACK ---");
-        period = xTaskGetTickCount();
-        while(millis() < period + ACK_WINDOW) {
-
-            
-            if(loraSerial.available() > 0){
-                String str = loraSerial.readStringUntil('\n');
-                Serial.println("str from lora: " + str);
-                str.trim();
-
-                if (str.indexOf("radio_rx") == 0) {
-                Serial.println("Success! ACK receives: " + str);
-                } 
-                else if (str == "ok") {
-                Serial.println("Module is now listening...");
-                } 
-                else if (str == "radio_err") {
-                Serial.println("Slot Timeout: No signal heard.");
-                }
-                else {
-                // Catch-all for weird garbage
-                Serial.println("Unexpected: " + str);
-                }
-
-            }
-            vTaskDelay(5);
-        }
-
-        vTaskDelay(5000);
-
-        
-        Serial.println("\n--- Fifth Sending window ---");
-        period = xTaskGetTickCount();
-        while(millis() < period + TX_WINDOW) {
-            
-            loraSerial.println("radio tx AAAAAAAAAA");
-            loraSerial.readStringUntil('\n');
-            loraSerial.readStringUntil('\n');
-
-            vTaskDelay(10);
-        }
-
-        loraSerial.println("radio rx 0");
-        //Read ACK
-        Serial.println("\n--- Listening for ACK ---");
-        period = xTaskGetTickCount();
-        while(millis() < period + ACK_WINDOW) {
-
-            
-            if(loraSerial.available() > 0){
-                String str = loraSerial.readStringUntil('\n');
-                Serial.println("str from lora: " + str);
-                str.trim();
-
-                if (str.indexOf("radio_rx") == 0) {
-                Serial.println("Success! ACK receives: " + str);
-                } 
-                else if (str == "ok") {
-                Serial.println("Module is now listening...");
-                } 
-                else if (str == "radio_err") {
-                Serial.println("Slot Timeout: No signal heard.");
-                }
-                else {
-                // Catch-all for weird garbage
-                Serial.println("Unexpected: " + str);
-                }
-
-            }
-            vTaskDelay(5);
-        }
-        vTaskDelay(4500);
     }
 }
 /*
@@ -423,6 +251,7 @@ void Sensor_TaskManager(void * pvParameters){
 void setup() {
     Serial.begin(115200);
     delay(500);
+    
 
     Serial.println("\n===== TDMA Multi-Node Simulator =====");
     Serial.println("Windows: +5s (thermostat), +15s (lighting), +35s (security)");

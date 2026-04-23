@@ -1,17 +1,25 @@
 #include <Arduino.h>
+//#include <rn2xx3.h>
 #include <HardwareSerial.h>
 
 #define RECEPTION_TIME 10000
 #define FRAME_SIZE 60000
-#define READING_WINDOW 3000
-#define ACK_WINDOW 2000
+#define READING_WINDOW 2000
+#define ACK_WINDOW 1000
 #define GUARD_TIME 500
 #define BEACON_TIME 500
 #define RST 21
 
-String str;
+//LoraWAn config
+#define RESET 23
+HardwareSerial loraWAN(1);
+//rn2xx3 myLoraWAN(loraWAN);
 
+
+String str;
 HardwareSerial loraTDMA(2);
+
+
 
 struct Node {
     String devAddr;     
@@ -124,6 +132,7 @@ void TDMA_TaskManager(void * pvParameters){
 
   }
 }
+
 /*
 void LoraWAN_TaskManager(void * pvParameters){
   //Handle LoraWAN communication
@@ -134,7 +143,55 @@ void LoraWAN_TaskManager(void * pvParameters){
 //TODO::Add another task for downlink communication and instant actions
 //TODO::Handle teh actual data
 
+/*
+void initialize_LoraWAN_Radio()
+{
+  //reset RN2xx3
+  pinMode(RESET, OUTPUT);
+  digitalWrite(RESET, LOW);
+  delay(100);
+  digitalWrite(RESET, HIGH);
 
+  delay(100); //wait for the RN2xx3's startup message
+  loraWAN.flush();
+
+  //check communication with radio
+  String hweui = myLora.hweui();
+  while(hweui.length() != 16)
+  {
+    Serial.println("Communication with RN2xx3 unsuccessful. Power cycle the board.");
+    Serial.println(hweui);
+    delay(10000);
+    hweui = myLora.hweui();
+  }
+
+  //print out the HWEUI so that we can register it via ttnctl
+  Serial.println("When using OTAA, register this DevEUI: ");
+  Serial.println(hweui);
+  Serial.println("RN2xx3 firmware version:");
+  Serial.println(myLora.sysver());
+
+  //configure your keys and join the network
+  Serial.println("Trying to join TTN");
+  bool join_result = false;
+
+  //ABP: initABP(String addr, String AppSKey, String NwkSKey);
+  //join_result = myLora.initABP("02017201", "8D7FFEF938589D95AAD928C2E2E7E48F", "AE17E567AECC8787F749A62F5541D522");
+
+  //OTAA: initOTAA(String AppEUI, String AppKey);
+  /oin_result = myLora.initOTAA("A84041FDFEDC3FF1", "A23C96EE13804963F8C2BD6285448198");
+
+  while(!join_result)
+  {
+    Serial.println("Unable to join. Are your keys correct, and do you have TTN coverage?");
+    delay(60000); //delay a minute before retry
+    join_result = myLora.init();
+  }
+  Serial.println("Successfully joined TTN");
+
+}
+
+*/
 void setup() {
   // start the serial monitor at the speed we set in the ini file
   Serial.begin(19200);
@@ -143,9 +200,16 @@ void setup() {
 
   loraTDMA.begin(57600, SERIAL_8N1, 16, 17);
 
+  //loraWAN.begin(57600, SERIAL_8N1, 18, 19);
+
+  //initialize_LoraWAN_Radio();
+
+  //loraWAN.tx("TTN Mapper on ESP8266 node");
+
   digitalWrite(RST, LOW);
   delay(200);
   digitalWrite(RST, HIGH);
+
 
 
   loraTDMA.setTimeout(1000);
@@ -168,7 +232,7 @@ void setup() {
   str = loraTDMA.readStringUntil('\n');
   Serial.println(str);
   
-  loraTDMA.println("radio set freq 869100000");
+  loraTDMA.println("radio set freq 868100000");
   str = loraTDMA.readStringUntil('\n');
   Serial.println(str);
   
