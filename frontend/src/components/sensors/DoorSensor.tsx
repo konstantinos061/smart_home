@@ -8,9 +8,10 @@ interface DoorSensorProps {
   nodeName: string;
   sensorId: number;
   data: Telemetry[];
+  onDelete?: (sensorId: number, sensorName: string) => void;
 }
 
-export function DoorSensor({ sensorName, nodeName, sensorId, data }: DoorSensorProps) {
+export function DoorSensor({ sensorName, nodeName, sensorId, data, onDelete }: DoorSensorProps) {
   const latestData = data.length > 0 ? data[data.length - 1] : null;
   const [showHistory, setShowHistory] = useState(false);
   
@@ -41,8 +42,17 @@ export function DoorSensor({ sensorName, nodeName, sensorId, data }: DoorSensorP
         <div className="door-sensor-header">
           <h3>{sensorName}</h3>
           <div className="header-actions">
-            <button className="history-button" onClick={() => setShowHistory(true)}>📊</button>
             <span className="node-badge">{nodeName}</span>
+            <button className="history-button" onClick={() => setShowHistory(true)}>📊</button>
+            {onDelete && (
+              <button 
+                className="delete-button" 
+                onClick={() => onDelete(sensorId, sensorName)}
+                title="Delete sensor"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 

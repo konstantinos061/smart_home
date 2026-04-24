@@ -8,9 +8,10 @@ interface ThermostatSensorProps {
   nodeName: string;
   sensorId: number;
   data: Telemetry[];
+  onDelete?: (sensorId: number, sensorName: string) => void;
 }
 
-export function ThermostatSensor({ sensorName, nodeName, sensorId, data }: ThermostatSensorProps) {
+export function ThermostatSensor({ sensorName, nodeName, sensorId, data, onDelete }: ThermostatSensorProps) {
   const setTempData = data
     .filter(d => d.key === 'setTemperature')
     .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
@@ -66,8 +67,17 @@ export function ThermostatSensor({ sensorName, nodeName, sensorId, data }: Therm
         <div className="thermostat-sensor-header">
           <h3>{sensorName}</h3>
           <div className="header-actions">
-            <button className="history-button" onClick={() => setShowHistory(true)}>📊</button>
             <span className="node-badge">{nodeName}</span>
+            <button className="history-button" onClick={() => setShowHistory(true)}>📊</button>
+            {onDelete && (
+              <button 
+                className="delete-button" 
+                onClick={() => onDelete(sensorId, sensorName)}
+                title="Delete sensor"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 
