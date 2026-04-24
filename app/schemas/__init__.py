@@ -10,6 +10,9 @@ from .common import (
     StatusResponse,
     TelemetryResponse,
     LatestTelemetryResponse,
+    SensorCreatePayload,
+    SensorsResponse,
+    SensorCreatePayload,
     UplinkPayload,
 )
 
@@ -25,5 +28,7 @@ __all__ = [
     'StatusResponse',
     'TelemetryResponse',
     'LatestTelemetryResponse',
+    'SensorsResponse',
+    'SensorCreatePayload',
     'UplinkPayload',
 ]

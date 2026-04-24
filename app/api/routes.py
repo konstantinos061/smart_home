@@ -344,7 +344,7 @@ def create_sensor(payload: SensorCreatePayload, db: Session = Depends(get_db)):
     return {'status': 'ok'}
 
 
-@router.post('sensors/{sensor_id}/delete', response_model=StatusResponse)
+@router.post('/sensors/{sensor_id}/delete', response_model=StatusResponse)
 def delete_sensor(sensor_id: int, db: Session = Depends(get_db)):
     sensor = db.get(NodeSensor, sensor_id)
     if not sensor:
