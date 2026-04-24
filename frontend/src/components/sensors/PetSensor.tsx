@@ -9,9 +9,10 @@ interface PetSensorProps {
   nodeName: string;
   sensorId: number;
   latestData: Telemetry;
+  onDelete?: (sensorId: number, sensorName: string) => void;
 }
 
-export function PetSensor({ sensorName, nodeId, nodeName, sensorId, latestData }: PetSensorProps) {
+export function PetSensor({ sensorName, nodeId, nodeName, sensorId, latestData, onDelete }: PetSensorProps) {
   const [lastDetectionTime, setLastDetectionTime] = useState<Date | null>(null);
   const [isFetchingHistory, setIsFetchingHistory] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -93,8 +94,17 @@ export function PetSensor({ sensorName, nodeId, nodeName, sensorId, latestData }
         <div className="pet-sensor-header">
           <h3>{sensorName}</h3>
           <div className="header-actions">
-            <button className="history-button" onClick={() => setShowHistory(true)}>📊</button>
             <span className="node-badge">{nodeName}</span>
+            <button className="history-button" onClick={() => setShowHistory(true)}>📊</button>
+            {onDelete && (
+              <button 
+                className="delete-button" 
+                onClick={() => onDelete(sensorId, sensorName)}
+                title="Delete sensor"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 

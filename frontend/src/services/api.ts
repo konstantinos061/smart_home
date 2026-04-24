@@ -54,6 +54,15 @@ export interface CommandResponse {
   commandId: string;
 }
 
+export interface SensorInfo {
+  sensorId: number;
+  nodeId?: string | null;
+  sensorName?: string | null;
+  sensorType: string;
+  batteryPct?: number | null;
+  isActive: boolean;
+}
+
 // ==========================================
 // API Functions
 // ==========================================
@@ -82,6 +91,11 @@ export const getAllNodesLatest = async (): Promise<NodeLatest[]> => {
   return response.data;
 };
 
+export const getAllSensors = async (): Promise<SensorInfo[]> => {
+  const response = await api.get('/api/v1/sensors');
+  return response.data;
+};
+
 // --- Administration & Commands ---
 
 export const createNode = async (payload: { nodeId: string; name?: string }): Promise<StatusResponse> => {
@@ -89,8 +103,18 @@ export const createNode = async (payload: { nodeId: string; name?: string }): Pr
   return response.data;
 };
 
+export const createSensor = async (payload: { id: number; name?: string }): Promise<StatusResponse> => {
+  const response = await api.post('/api/v1/sensors', payload);
+  return response.data;
+};
+
 export const renameSensor = async (sensorId: number, name: string): Promise<StatusResponse> => {
   const response = await api.post(`/api/v1/sensors/${sensorId}/name`, { name });
+  return response.data;
+};
+
+export const deleteSensor = async (sensorId: number): Promise<StatusResponse> => {
+  const response = await api.post(`/api/v1/sensors/${sensorId}/delete`);
   return response.data;
 };
 

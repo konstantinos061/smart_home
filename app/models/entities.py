@@ -33,10 +33,10 @@ class NodeSensor(Base):
     __tablename__ = 'node_sensors'
 
     id = Column(Integer, primary_key=True)
-    node_id = Column(String(64), ForeignKey('nodes.node_id'), nullable=False)
+    node_id = Column(String(64), ForeignKey('nodes.node_id'), nullable=True)
     name = Column(String(128), nullable=False)
     type = Column(
-        Enum('thermostat', 'door', 'pet', name='sensor_type_enum'),
+        Enum('thermostat', 'door', 'pet', 'unknown', name='sensor_type_enum'),
         nullable=False,
     )
     battery_pct = Column(Integer, nullable=True)

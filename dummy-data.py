@@ -46,7 +46,7 @@ def main():
     # 1. Register our nodes
     nodes = [
         {"id": "123", "name": "Test Node"},
-        {"id": "node-beta-002", "name": "Front Gate Controller"}
+        # {"id": "node-beta-002", "name": "Front Gate Controller"}
     ]
     
     for node in nodes:
@@ -60,29 +60,41 @@ def main():
     for minutes_ago in range(60, -1, -15):
         
         # --- Node Alpha (Thermostat Simulation) ---
-        alpha_measurements = [
-            {
-                "sensorId": 1,
-                "sensorType": "thermostat",
-                "key": "temperature",
-                "unit": "celsius",
-                "value": round(random.uniform(20.5, 23.5), 2),
-                "batteryPct": 85, # Healthy battery,
-                "rssi": random.randint(-120, -50),  # Realistic LoRaWAN RSSI values
-                "snr": round(random.uniform(-10.0, 10.0), 1),
-            },
-            {
-                "sensorId": 1,
-                "sensorType": "thermostat",
-                "key": "humidity",
-                "unit": "percent",
-                "value": round(random.uniform(40.0, 55.0), 1),
-                "batteryPct": 85,
-                "rssi": random.randint(-120, -50),  # Realistic LoRaWAN RSSI values
-                "snr": round(random.uniform(-10.0, 10.0), 1),
-            }
-        ]
-        send_uplink(nodes[0]["id"], minutes_ago, alpha_measurements)
+        # All keys (temperature, humidity, setTemperature) sent together for sensor 0
+        for sensor_id in [0, 63]:
+            alpha_measurements = [
+                {
+                    "sensorId": sensor_id,
+                    "sensorType": "thermostat",
+                    "key": "temperature",
+                    "unit": "celsius",
+                    "value": round(random.uniform(20.5, 23.5), 2),
+                    "batteryPct": 85,
+                    "rssi": random.randint(-120, -50),
+                    "snr": round(random.uniform(-10.0, 10.0), 1),
+                },
+                {
+                    "sensorId": sensor_id,
+                    "sensorType": "thermostat",
+                    "key": "humidity",
+                    "unit": "percent",
+                    "value": round(random.uniform(40.0, 55.0), 1),
+                    "batteryPct": 85,
+                    "rssi": random.randint(-120, -50),
+                    "snr": round(random.uniform(-10.0, 10.0), 1),
+                },
+                {
+                    "sensorId": sensor_id,
+                    "sensorType": "thermostat",
+                    "key": "setTemperature",
+                    "unit": "celsius",
+                    "value": 22.0,
+                    "batteryPct": 85,
+                    "rssi": random.randint(-120, -50),
+                    "snr": round(random.uniform(-10.0, 10.0), 1),
+                }
+            ]
+            send_uplink(nodes[0]["id"], minutes_ago, alpha_measurements)
 
         # --- Node Beta (Door & Pet Sensor Simulation) ---
         # Let's simulate a dying battery to trigger your Alert logic!
@@ -90,21 +102,21 @@ def main():
 
         beta_measurements = [
             {
-                "sensorId": 2,
+                "sensorId": 64,
                 "sensorType": "door",
                 "key": "status",
                 "unit": "state",
                 "value": random.choice([True, False]), # Door open/closed
                 "batteryPct": beta_battery,
-                "rssi": random.randint(-120, -50),  # Realistic LoRaWAN RSSI values
+                "rssi": random.randint(-120, -50),
                 "snr": round(random.uniform(-10.0, 10.0), 1),
             },
             {
-                "sensorId": 3,
+                "sensorId": 128,
                 "sensorType": "pet",
                 "key": "presence",
                 "unit": "state",
-                "value": "detected" if random.random() > 0.99 else "clear",
+                "value": "detected",
                 "batteryPct": 99, # Pet collar battery is fine
                 "rssi": random.randint(-120, -50),  # Realistic LoRaWAN RSSI values
                 "snr": round(random.uniform(-10.0, 10.0), 1),

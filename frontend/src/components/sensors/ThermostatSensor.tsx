@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Telemetry } from '../../services/api';
 import { HistoryModal } from '../HistoryModal';
 import './ThermostatSensor.css';
@@ -8,19 +8,27 @@ interface ThermostatSensorProps {
   nodeName: string;
   sensorId: number;
   data: Telemetry[];
+  onDelete?: (sensorId: number, sensorName: string) => void;
 }
 
-export function ThermostatSensor({ sensorName, nodeName, sensorId, data }: ThermostatSensorProps) {
-  // Find set temperature from API data
+export function ThermostatSensor({ sensorName, nodeName, sensorId, data, onDelete }: ThermostatSensorProps) {
   const setTempData = data
     .filter(d => d.key === 'setTemperature')
     .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
-  
-  const initialSetTemp = setTempData?.valueNumeric ?? 22;
-  
-  const [setTemp, setSetTemp] = useState<number>(initialSetTemp);
+
+  const [setTemp, setSetTemp] = useState<number>(22);
   const [showHistory, setShowHistory] = useState(false);
-    console.log('ThermostatSensor data:', data);
+
+  useEffect(() => {
+    if (setTempData?.valueNumeric != null) {
+      setSetTemp(setTempData.valueNumeric);
+      return;
+    }
+
+    if (data.length > 0) {
+      setSetTemp(22);
+    }
+  }, [setTempData?.valueNumeric, data.length]);
   // Find latest temperature and humidity readings
   const tempData = data
     .filter(d => d.key === 'temperature')
@@ -59,8 +67,17 @@ export function ThermostatSensor({ sensorName, nodeName, sensorId, data }: Therm
         <div className="thermostat-sensor-header">
           <h3>{sensorName}</h3>
           <div className="header-actions">
-            <button className="history-button" onClick={() => setShowHistory(true)}>📊</button>
             <span className="node-badge">{nodeName}</span>
+            <button className="history-button" onClick={() => setShowHistory(true)}>📊</button>
+            {onDelete && (
+              <button 
+                className="delete-button" 
+                onClick={() => onDelete(sensorId, sensorName)}
+                title="Delete sensor"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 

@@ -53,6 +53,11 @@ class SensorNamePayload(BaseModel):
     name: str
 
 
+class SensorCreatePayload(BaseModel):
+    id: int
+    name: Optional[str] = None
+
+
 class StatusResponse(BaseModel):
     status: str
 
@@ -80,6 +85,7 @@ class TelemetryResponse(BaseModel):
 
 class LatestTelemetryResponse(BaseModel):
     time: datetime
+    nodeId: str
     sensorId: int
     sensorName: Optional[str] = None
     sensorType: str
@@ -104,3 +110,13 @@ class NodeLatestResponse(BaseModel):
     rssi: Optional[int] = None
     snr: Optional[float] = None
     latestTelemetry: List[LatestTelemetryResponse] = []
+
+
+class SensorsResponse(BaseModel):
+    sensorId: int
+    nodeId: Optional[str] = None
+    sensorName: Optional[str] = None
+    sensorType: str
+    batteryVoltage: Optional[float] = None
+    batteryPct: Optional[int] = None
+    isActive: bool
