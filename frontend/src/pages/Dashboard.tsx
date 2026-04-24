@@ -1,26 +1,34 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getHealth, getAllNodesLatest, type NodeLatest, type Telemetry } from '../services/api';
+import { getHealth, getAllNodesLatest, getAllSensors, deleteSensor, type NodeLatest, type Telemetry, type SensorInfo } from '../services/api';
 import { DoorSensor } from '../components/sensors/DoorSensor';
 import { ThermostatSensor } from '../components/sensors/ThermostatSensor';
 import { PetSensor } from '../components/sensors/PetSensor';
+import { AddSensorModal } from '../components/AddSensorModal';
+import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
 import './Dashboard.css';
 
 export function Dashboard() {
   const [nodes, setNodes] = useState<NodeLatest[]>([]);
+  const [allSensors, setAllSensors] = useState<SensorInfo[]>([]);
   const [health, setHealth] = useState<{ status: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [sensorToDelete, setSensorToDelete] = useState<{ id: number; name: string } | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // STRIPPED: We now only fetch the exact data we need.
-        const [nodesData, healthData] = await Promise.all([
+        const [nodesData, sensorsData, healthData] = await Promise.all([
           getAllNodesLatest(),
+          getAllSensors(),
           getHealth(),
         ]);
         setNodes(nodesData);
+        setAllSensors(sensorsData);
         setHealth(healthData);
       } catch (err) {
         setError('Failed to load dashboard data');
@@ -35,8 +43,19 @@ export function Dashboard() {
 
   const summary = useMemo(() => {
     // Map holds arrays of Telemetry objects for each sensor
-    const sensorsByType = new Map<string, Map<number, Telemetry[]>>();
+    const sensorsByType = new Map<string, Map<number, Telemetry[] | null>>();
 
+    // First, add all sensors (with null telemetry if no data)
+    allSensors.forEach((sensor) => {
+      if (!sensorsByType.has(sensor.sensorType)) {
+        sensorsByType.set(sensor.sensorType, new Map());
+      }
+      
+      // Initialize with null, will be replaced if telemetry exists
+      sensorsByType.get(sensor.sensorType)!.set(sensor.sensorId, null);
+    });
+
+    // Then, add/override with actual telemetry data
     nodes.forEach((node) => {
       if (!node.latestTelemetry) return;
 
@@ -50,7 +69,12 @@ export function Dashboard() {
         }
         
         // Add all readings for this sensor
-        sensorsByType.get(latestItem.sensorType)!.get(latestItem.sensorId)!.push(latestItem);
+        const existing = sensorsByType.get(latestItem.sensorType)!.get(latestItem.sensorId);
+        if (Array.isArray(existing)) {
+          existing.push(latestItem);
+        } else {
+          sensorsByType.get(latestItem.sensorType)!.set(latestItem.sensorId, [latestItem]);
+        }
       });
     });
 
@@ -62,7 +86,36 @@ export function Dashboard() {
       sensorsByType,
       activeNodes: nodes.filter(n => n.isActive).length,
     };
-  }, [nodes]); // Dependency array is now super clean
+  }, [nodes, allSensors]);
+
+  const handleDeleteClick = (sensorId: number, sensorName: string) => {
+    setSensorToDelete({ id: sensorId, name: sensorName });
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!sensorToDelete) return;
+    setDeleteLoading(true);
+    try {
+      await deleteSensor(sensorToDelete.id);
+      // Refresh data after deletion
+      const [nodesData, sensorsData, healthData] = await Promise.all([
+        getAllNodesLatest(),
+        getAllSensors(),
+        getHealth(),
+      ]);
+      setNodes(nodesData);
+      setAllSensors(sensorsData);
+      setHealth(healthData);
+      setShowDeleteConfirm(false);
+      setSensorToDelete(null);
+    } catch (err) {
+      console.error('Failed to delete sensor:', err);
+      setError('Failed to delete sensor');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   if (loading) {
     return <div className="dashboard-loading">Loading dashboard...</div>;
@@ -126,11 +179,42 @@ export function Dashboard() {
           {sensorsMap.size > 0 ? (
             <div className="sensors-grid">
               {Array.from(sensorsMap.entries()).map(([sensorId, sensorData]) => {
-                
-                const sensorNodeId = sensorData[0].nodeId;
+                // Get sensor info from allSensors
+                const sensorInfo = allSensors.find(s => s.sensorId === sensorId);
+                const sensorName = sensorInfo?.sensorName || `Sensor #${sensorId}`;
+                const sensorNodeId = sensorData ? sensorData[0].nodeId : sensorInfo?.nodeId;
                 const node = nodes.find(n => n.nodeId === sensorNodeId);
-                const sensorName = sensorData[0].sensorName || `Sensor #${sensorId}`;
-                const nodeName = node?.nodeName || sensorNodeId;
+                const nodeName = node?.nodeName || sensorNodeId || 'Unknown Node';
+                
+                // Handle sensors with no telemetry
+                if (!sensorData || sensorData.length === 0) {
+                  return (
+                    <div key={`${sensorType}-${sensorId}`}>
+                      <div className="sensor-card-no-data">
+                        <div className="card-header">
+                          <h3>{sensorName}</h3>
+                          <div className="header-actions">
+                            <span className="node-badge">{nodeName}</span>
+                            {sensorInfo && (
+                              <button 
+                                className="delete-button" 
+                                onClick={() => handleDeleteClick(sensorId, sensorName)}
+                                title="Delete sensor"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="no-telemetry-message">
+                          <div className="icon">📡</div>
+                          <p>No telemetry data yet</p>
+                          <small>Waiting for first sensor reading...</small>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
                 
                 return (
                   <div key={`${sensorType}-${sensorId}`}>
@@ -140,6 +224,7 @@ export function Dashboard() {
                         nodeName={nodeName}
                         sensorId={sensorId}
                         data={sensorData}
+                        onDelete={handleDeleteClick}
                       />
                     )}
                     {sensorType === 'thermostat' && (
@@ -148,6 +233,7 @@ export function Dashboard() {
                         nodeName={nodeName}
                         sensorId={sensorId}
                         data={sensorData}
+                        onDelete={handleDeleteClick}
                       />
                     )}
                     {sensorType === 'pet' && (
@@ -155,8 +241,9 @@ export function Dashboard() {
                         sensorName={sensorName}
                         nodeId={sensorNodeId}
                         nodeName={nodeName}
-                        sensorId={sensorId}       // <-- Added to allow history fetching
-                        latestData={sensorData[0]}   // <-- Passed the first (and likely only) object
+                        sensorId={sensorId}
+                        latestData={sensorData[0]}
+                        onDelete={handleDeleteClick}
                       />
                     )}
                   </div>
@@ -177,6 +264,43 @@ export function Dashboard() {
           <p>Start by registering some sensors and sending telemetry data</p>
         </div>
       )}
+
+      {/* Floating Add Button */}
+      <button className="fab-button" onClick={() => setShowAddModal(true)} title="Add new sensor">
+        ➕
+      </button>
+
+      {/* Modals */}
+      <AddSensorModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSensorAdded={() => {
+          setShowAddModal(false);
+          // Refresh dashboard
+          const fetchData = async () => {
+            const [nodesData, sensorsData, healthData] = await Promise.all([
+              getAllNodesLatest(),
+              getAllSensors(),
+              getHealth(),
+            ]);
+            setNodes(nodesData);
+            setAllSensors(sensorsData);
+            setHealth(healthData);
+          };
+          fetchData();
+        }}
+      />
+
+      <DeleteConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setSensorToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        sensorName={sensorToDelete?.name || ''}
+        loading={deleteLoading}
+      />
     </div>
   );
 }
