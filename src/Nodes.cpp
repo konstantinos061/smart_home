@@ -70,6 +70,7 @@ static bool loraInit() {
     loraCmd("mac pause", 1000);
 
     String r;
+    r = loraCmd("sys get hweui");        if (r != "ok") { Serial.println("[LORA] EUID -> " + r);}
     r = loraCmd("radio set mod lora");        if (r != "ok") { Serial.println("[LORA] mod lora -> " + r); return false; }
     r = loraCmd("radio set freq " LORA_FREQ); if (r != "ok") { Serial.println("[LORA] freq -> "     + r); return false; }
     r = loraCmd("radio set pwr "  LORA_PWR);  if (r != "ok") { Serial.println("[LORA] pwr -> "      + r); return false; }
@@ -194,7 +195,7 @@ void Comms_TaskManager(void * pvParameters){
         
         Serial.println("\n--- First Sending window ---");
         period = xTaskGetTickCount();
-        while(millis() < period + TX_WINDOW) {
+        while(xTaskGetTickCount() < (period + pdMS_TO_TICKS(TX_WINDOW))) {
             
             loraSerial.println("radio tx AAAAAAAAAA");
             loraSerial.readStringUntil('\n');
@@ -208,7 +209,7 @@ void Comms_TaskManager(void * pvParameters){
         //Read ACK
         Serial.println("\n--- Listening for ACK ---");
         period = xTaskGetTickCount();
-        while(millis() < period + ACK_WINDOW) {
+        while(xTaskGetTickCount() < (period + pdMS_TO_TICKS(ACK_WINDOW))) {
 
             
             if(loraSerial.available() > 0){
@@ -233,6 +234,7 @@ void Comms_TaskManager(void * pvParameters){
             }
             vTaskDelay(5);
         }
+
         through_way_copy = start_time;
         xTaskDelayUntil(&through_way_copy, pdMS_TO_TICKS(NEW_BEACON));
 

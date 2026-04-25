@@ -90,6 +90,9 @@ void TDMA_TaskManager(void * pvParameters){
 
         Serial.printf("Slot %d: Waiting for %s\n", i, network[i].devAddr.c_str());
 
+        loraTDMA.println("radio rxstop");
+        loraTDMA.readStringUntil('\n'); //clear the ok form this command
+        
         loraTDMA.println("radio rx 0"); 
         
         period = xTaskGetTickCount();
@@ -179,7 +182,7 @@ void initialize_LoraWAN_Radio()
   //join_result = myLora.initABP("02017201", "8D7FFEF938589D95AAD928C2E2E7E48F", "AE17E567AECC8787F749A62F5541D522");
 
   //OTAA: initOTAA(String AppEUI, String AppKey);
-  /oin_result = myLora.initOTAA("A84041FDFEDC3FF1", "A23C96EE13804963F8C2BD6285448198");
+  /oin_result = myLora.initOTAA("A84041FDFEDC3FF1", "0000000000000000");
 
   while(!join_result)
   {
@@ -223,6 +226,11 @@ void setup() {
   loraTDMA.println("sys get ver");
   str = loraTDMA.readStringUntil('\n');
   Serial.println("Module Version" + str);
+
+  loraTDMA.println("sys get hweui");
+  str = loraTDMA.readStringUntil('\n');
+  Serial.println("EUI Version: " + str);
+
   
   loraTDMA.println("mac pause");
   str = loraTDMA.readStringUntil('\n');
