@@ -12,7 +12,7 @@ SENSOR_TYPE_MAP = {
 }
 
 THERMOSTAT_SCALE = 100.0
-SENSOR_RECORD_SIZE = 9
+SENSOR_RECORD_SIZE = 8
 
 
 def decode_payload(payload: UplinkPayload) -> list[MeasurementPayload]:
@@ -66,9 +66,9 @@ def _decode_thermostat(
         raise ValueError('Thermostat payload must be 9 bytes: header + temperature + humidity + set temperature + battery.')
 
     current_temp = _read_signed_scaled(raw_payload[2:4])
-    humidity = _read_unsigned_scaled(raw_payload[4:6])
-    set_temp = _read_signed_scaled(raw_payload[6:8])
-    battery_pct = _read_battery_pct(raw_payload[8])
+    humidity = _read_unsigned_scaled(raw_payload[4:5])
+    set_temp = _read_signed_scaled(raw_payload[5:7])
+    battery_pct = _read_battery_pct(raw_payload[7])
 
     return [
         MeasurementPayload(
