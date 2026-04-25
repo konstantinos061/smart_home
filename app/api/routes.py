@@ -26,6 +26,7 @@ from app.schemas import (
     SensorCreatePayload,
     UplinkPayload,
 )
+from app.services.chirpstack import enqueue_device_queue_item
 from app.services.downlink_encoder import encode_downlink_payload
 from app.services.payload_decoder import decode_payload
 
@@ -224,8 +225,11 @@ async def ingest_uplink(payload: UplinkPayload, db: Session = Depends(get_db)):
     node.last_seen_at = payload.timestamp
 
     # 2. Process Measurements
+    sensors_by_id: dict[int, NodeSensor] = {}
     for measurement in measurements:
-        sensor = db.get(NodeSensor, measurement.sensorId)
+        sensor = sensors_by_id.get(measurement.sensorId)
+        if sensor is None:
+            sensor = db.get(NodeSensor, measurement.sensorId)
         if sensor is None:
             sensor = NodeSensor(
                 id=measurement.sensorId,
@@ -234,9 +238,11 @@ async def ingest_uplink(payload: UplinkPayload, db: Session = Depends(get_db)):
                 type=measurement.sensorType,  # FIXED: Changed from sensor_type to type
             )
             db.add(sensor)
+            sensors_by_id[measurement.sensorId] = sensor
         else:
             sensor.type = measurement.sensorType
-            sensor.node_id = payload.nodeId 
+            sensor.node_id = payload.nodeId
+            sensors_by_id[measurement.sensorId] = sensor
 
         if measurement.batteryPct is not None:
             sensor.battery_pct = measurement.batteryPct
@@ -400,13 +406,8 @@ def delete_sensor(sensor_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {'status': 'ok'}
 
-
-@router.post('/nodes/{node_id}/commands', response_model=CommandResponse)
-def create_command(node_id: str, payload: CommandCreatePayload, db: Session = Depends(get_db)):
-    node = db.get(Node, node_id)
-    if not node:
-        raise HTTPException(status_code=404, detail='Node not found')
-
+@router.post("/nodes/{node_id}/commands", response_model=CommandResponse)
+def create_command(node_id: str, payload: CommandCreatePayload,):
     try:
         downlink = encode_downlink_payload(
             payload.commandType,
@@ -416,18 +417,24 @@ def create_command(node_id: str, payload: CommandCreatePayload, db: Session = De
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    return {
-        'body': {
-            'flushQueue': payload.flushQueue,
-            'queueItem': {
-                'confirmed': downlink['confirmed'],
-                'data': downlink['data'],
-                'expiresAt': payload.expiresAt,
-                'fPort': downlink['fPort'],
-                'object': payload.payload,
-            },
+    chirpstack_result = enqueue_device_queue_item(
+        node_id,
+        {
+            "confirmed": downlink["confirmed"],
+            "data": downlink["data"],
+            "fCntDown": payload.fCntDown,
+            "fPort": downlink["fPort"],
+            "id": payload.id,
+            "isEncrypted": payload.isEncrypted,
+            "isPending": payload.isPending,
         },
-        'deviceQueueUrl': f'/api/devices/{node_id}/queue',
-        'devEui': node_id,
-        'status': 'ok',
+        flush_queue=payload.flushQueue,
+    )
+
+    return {
+        "body": chirpstack_result["body"],
+        "deviceQueueUrl": f"/api/devices/{node_id}/queue",
+        "devEui": node_id,
+        "status": "ok",
+        "chirpstackResponse": chirpstack_result["chirpstackResponse"],
     }

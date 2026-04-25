@@ -67,11 +67,14 @@ export interface CommandResponse {
     queueItem: {
       confirmed: boolean;
       data: string;
-      expiresAt?: string | null;
+      fCntDown?: number | null;
       fPort: number;
-      object: Record<string, any>;
+      id?: string | null;
+      isEncrypted?: boolean | null;
+      isPending?: boolean | null;
     };
   };
+  chirpstackResponse?: Record<string, any> | null;
 }
 
 export interface SensorInfo {
@@ -147,6 +150,10 @@ export const sendCommand = async (
     expiresAt?: string;
     confirmed?: boolean;
     flushQueue?: boolean;
+    fCntDown?: number;
+    id?: string;
+    isEncrypted?: boolean;
+    isPending?: boolean;
   }
 ): Promise<CommandResponse> => {
   const response = await api.post(`/api/v1/nodes/${nodeId}/commands`, command);

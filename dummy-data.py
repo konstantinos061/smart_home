@@ -1,3 +1,4 @@
+import base64
 import requests
 import random
 import time
@@ -22,16 +23,38 @@ def create_node(node_id: str, name: str):
     else:
         print(f"❌ Failed to create node {node_id}: {response.text}")
 
-def send_uplink(node_id: str, minutes_ago: int, measurements: list):
+def encode_thermostat_payload(
+    sensor_id: int,
+    temperature: float,
+    humidity: float,
+    set_temperature: float,
+    battery_pct: int,
+) -> str:
+    """Encodes one thermostat sensor record into the API's base64 uplink format."""
+    if sensor_id < 0 or sensor_id > 63:
+        raise ValueError("Thermostat sensor IDs must be between 0 and 63.")
+    if battery_pct < 0 or battery_pct > 100:
+        raise ValueError("Battery percentage must be between 0 and 100.")
+
+    payload_bytes = bytes([sensor_id & 0x3F])
+    payload_bytes += round(temperature * 100).to_bytes(2, byteorder="big", signed=True)
+    payload_bytes += round(humidity * 100).to_bytes(2, byteorder="big", signed=False)
+    payload_bytes += round(set_temperature * 100).to_bytes(2, byteorder="big", signed=True)
+    payload_bytes += bytes([battery_pct])
+
+    return base64.b64encode(payload_bytes).decode("ascii")
+
+
+def send_uplink(node_id: str, minutes_ago: int, data: str, rssi: int, snr: float):
     """Sends a telemetry uplink to the API."""
     url = f"{API_BASE_URL}/uplink"
     
     payload = {
         "nodeId": node_id,
         "timestamp": get_iso_timestamp(minutes_ago),
-        "measurements": measurements,
-        # "rawPayloadHex": "0A0B0C0D", # Dummy payload
-        "metadata": {"simulated": True}
+        "data": data,
+        "metadata": {"simulated": True},
+        "rxInfo": [{"rssi": rssi, "snr": snr}],
     }
 
     response = requests.post(url, json=payload)
@@ -45,7 +68,7 @@ def main():
 
     # 1. Register our nodes
     nodes = [
-        {"id": "123", "name": "Test Node"},
+        {"id": "0004a30b0106480e", "name": "Test Node"},
         # {"id": "node-beta-002", "name": "Front Gate Controller"}
     ]
     
@@ -60,69 +83,18 @@ def main():
     for minutes_ago in range(60, -1, -15):
         
         # --- Node Alpha (Thermostat Simulation) ---
-        # All keys (temperature, humidity, setTemperature) sent together for sensor 0
+        # Each uplink contains one 8-byte thermostat sensor record.
         for sensor_id in [0, 63]:
-            alpha_measurements = [
-                {
-                    "sensorId": sensor_id,
-                    "sensorType": "thermostat",
-                    "key": "temperature",
-                    "unit": "celsius",
-                    "value": round(random.uniform(20.5, 23.5), 2),
-                    "batteryPct": 85,
-                    "rssi": random.randint(-120, -50),
-                    "snr": round(random.uniform(-10.0, 10.0), 1),
-                },
-                {
-                    "sensorId": sensor_id,
-                    "sensorType": "thermostat",
-                    "key": "humidity",
-                    "unit": "percent",
-                    "value": round(random.uniform(40.0, 55.0), 1),
-                    "batteryPct": 85,
-                    "rssi": random.randint(-120, -50),
-                    "snr": round(random.uniform(-10.0, 10.0), 1),
-                },
-                {
-                    "sensorId": sensor_id,
-                    "sensorType": "thermostat",
-                    "key": "setTemperature",
-                    "unit": "celsius",
-                    "value": 22.0,
-                    "batteryPct": 85,
-                    "rssi": random.randint(-120, -50),
-                    "snr": round(random.uniform(-10.0, 10.0), 1),
-                }
-            ]
-            send_uplink(nodes[0]["id"], minutes_ago, alpha_measurements)
-
-        # --- Node Beta (Door & Pet Sensor Simulation) ---
-        # Let's simulate a dying battery to trigger your Alert logic!
-        beta_battery = max(0, 25 - int((60 - minutes_ago) / 5)) 
-
-        beta_measurements = [
-            {
-                "sensorId": 64,
-                "sensorType": "door",
-                "key": "status",
-                "unit": "state",
-                "value": random.choice([True, False]), # Door open/closed
-                "batteryPct": beta_battery,
-                "rssi": random.randint(-120, -50),
-                "snr": round(random.uniform(-10.0, 10.0), 1),
-            },
-            {
-                "sensorId": 128,
-                "sensorType": "pet",
-                "key": "presence",
-                "unit": "state",
-                "value": "detected",
-                "batteryPct": 99, # Pet collar battery is fine
-                "rssi": random.randint(-120, -50),  # Realistic LoRaWAN RSSI values
-                "snr": round(random.uniform(-10.0, 10.0), 1),
-            }
-        ]
-        send_uplink(nodes[0]["id"], minutes_ago, beta_measurements)
+            rssi = random.randint(-120, -50)
+            snr = round(random.uniform(-10.0, 10.0), 1)
+            data = encode_thermostat_payload(
+                sensor_id=sensor_id,
+                temperature=round(random.uniform(20.5, 23.5), 2),
+                humidity=round(random.uniform(40.0, 55.0), 1),
+                set_temperature=22.0,
+                battery_pct=85,
+            )
+            send_uplink(nodes[0]["id"], minutes_ago, data, rssi, snr)
 
     print("\n✅ Data seeding complete. Check your frontend dashboard!")
 

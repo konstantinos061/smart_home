@@ -46,8 +46,12 @@ class CommandCreatePayload(BaseModel):
     payload: Dict[str, Any]
     requestedBy: Optional[str] = None
     expiresAt: Optional[datetime] = None
-    confirmed: bool = False
-    flushQueue: bool = True
+    confirmed: bool = True
+    flushQueue: bool = False
+    fCntDown: Optional[int] = None
+    id: Optional[str] = None
+    isEncrypted: Optional[bool] = None
+    isPending: Optional[bool] = None
 
 
 class NodeCreatePayload(BaseModel):
@@ -73,6 +77,7 @@ class CommandResponse(BaseModel):
     devEui: str
     deviceQueueUrl: str
     body: Dict[str, Any]
+    chirpstackResponse: Optional[Dict[str, Any]] = None
 
 
 class TelemetryResponse(BaseModel):

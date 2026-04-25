@@ -79,9 +79,9 @@ export function ThermostatSensor({ sensorName, nodeName, sensorId, data, onDelet
           value: Number(setTemp.toFixed(1)),
         },
       });
-      setCommandStatus('Prepared');
+      setCommandStatus('Queued');
     } catch (err) {
-      console.error('Failed to prepare set temperature downlink:', err);
+      console.error('Failed to enqueue set temperature downlink:', err);
       setCommandStatus('Failed');
     } finally {
       setCommandLoading(false);
