@@ -239,7 +239,7 @@ export function Dashboard() {
                     {sensorType === 'pet' && (
                       <PetSensor
                         sensorName={sensorName}
-                        nodeId={sensorNodeId}
+                        nodeId={sensorNodeId ?? ""}
                         nodeName={nodeName}
                         sensorId={sensorId}
                         latestData={sensorData[0]}

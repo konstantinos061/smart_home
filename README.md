@@ -175,3 +175,8 @@ smart_home/
 ## License
 
 MIT License - see LICENSE file for details
+
+
+Chripstack: http://10.0.0.1:8080/
+NodeRed: http://10.0.0.1:1880
+Adminer: http://localhost:8081/

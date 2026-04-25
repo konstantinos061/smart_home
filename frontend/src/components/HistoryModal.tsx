@@ -46,9 +46,9 @@ export function HistoryModal({ isOpen, onClose, nodeId, sensorId, sensorType, se
           timeMap.set(timeKey, { time: timeKey });
         }
         const entry = timeMap.get(timeKey)!;
-        if (item.key === 'temperature') entry.temperature = item.valueNumeric;
-        if (item.key === 'humidity') entry.humidity = item.valueNumeric;
-        if (item.key === 'setTemperature') entry.setTemperature = item.valueNumeric;
+        if (item.key === 'setTemperature' && item.valueNumeric !== null) entry.setTemperature = item.valueNumeric;
+        if (item.key === 'temperature' && item.valueNumeric !== null) entry.temperature = item.valueNumeric;
+        if (item.key === 'humidity' && item.valueNumeric !== null) entry.humidity = item.valueNumeric;
       });
       return Array.from(timeMap.values());
     } else {
