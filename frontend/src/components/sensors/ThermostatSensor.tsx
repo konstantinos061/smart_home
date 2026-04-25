@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Telemetry } from '../../services/api';
+import { sendCommand, type Telemetry } from '../../services/api';
 import { HistoryModal } from '../HistoryModal';
 import './ThermostatSensor.css';
 
@@ -18,6 +18,8 @@ export function ThermostatSensor({ sensorName, nodeName, sensorId, data, onDelet
 
   const [setTemp, setSetTemp] = useState<number>(22);
   const [showHistory, setShowHistory] = useState(false);
+  const [commandLoading, setCommandLoading] = useState(false);
+  const [commandStatus, setCommandStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (setTempData?.valueNumeric != null) {
@@ -53,9 +55,37 @@ export function ThermostatSensor({ sensorName, nodeName, sensorId, data, onDelet
   };
 
   const rssiInfo = getRssiLevel(rssi);
+  const nodeId = data[0]?.nodeId || '';
 
   const handleAdjustTemp = (delta: number) => {
+    setCommandStatus(null);
     setSetTemp(prev => Math.max(15, Math.min(30, prev + delta)));
+  };
+
+  const handleSendSetTemperature = async () => {
+    if (!nodeId) {
+      setCommandStatus('No node available');
+      return;
+    }
+
+    try {
+      setCommandLoading(true);
+      setCommandStatus(null);
+      await sendCommand(nodeId, {
+        commandType: 'setTemperature',
+        requestedBy: 'dashboard',
+        payload: {
+          sensorId,
+          value: Number(setTemp.toFixed(1)),
+        },
+      });
+      setCommandStatus('Prepared');
+    } catch (err) {
+      console.error('Failed to prepare set temperature downlink:', err);
+      setCommandStatus('Failed');
+    } finally {
+      setCommandLoading(false);
+    }
   };
 
   const tempDiff = currentTemp ? setTemp - currentTemp : 0;
@@ -98,7 +128,15 @@ export function ThermostatSensor({ sensorName, nodeName, sensorId, data, onDelet
               <button onClick={() => handleAdjustTemp(-0.1)}>−</button>
               <span className="temp-value">{setTemp.toFixed(1)}°C</span>
               <button onClick={() => handleAdjustTemp(0.1)}>+</button>
+              <button
+                className="apply-temp-button"
+                onClick={handleSendSetTemperature}
+                disabled={commandLoading}
+              >
+                {commandLoading ? '...' : 'Send'}
+              </button>
               </div>
+              {commandStatus && <div className="command-message">{commandStatus}</div>}
             </div>
 
             <div className="humidity-row">
@@ -156,7 +194,7 @@ export function ThermostatSensor({ sensorName, nodeName, sensorId, data, onDelet
       <HistoryModal
         isOpen={showHistory}
         onClose={() => setShowHistory(false)}
-        nodeId={data[0]?.nodeId || ''}
+        nodeId={nodeId}
         sensorId={sensorId}
         sensorType="thermostat"
         sensorName={sensorName}

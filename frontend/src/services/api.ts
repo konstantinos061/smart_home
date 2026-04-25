@@ -9,6 +9,15 @@ export const api = axios.create({
   },
 });
 
+export const getRealtimeUrl = (): string => {
+  const url = new URL(API_BASE_URL, window.location.origin);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  url.pathname = '/api/v1/ws';
+  url.search = '';
+  url.hash = '';
+  return url.toString();
+};
+
 // ==========================================
 // Data Transfer Objects (DTOs)
 // ==========================================
@@ -51,7 +60,18 @@ export interface StatusResponse {
 
 export interface CommandResponse {
   status: string;
-  commandId: string;
+  devEui: string;
+  deviceQueueUrl: string;
+  body: {
+    flushQueue: boolean;
+    queueItem: {
+      confirmed: boolean;
+      data: string;
+      expiresAt?: string | null;
+      fPort: number;
+      object: Record<string, any>;
+    };
+  };
 }
 
 export interface SensorInfo {
@@ -125,6 +145,8 @@ export const sendCommand = async (
     commandType: string;
     payload: Record<string, any>;
     expiresAt?: string;
+    confirmed?: boolean;
+    flushQueue?: boolean;
   }
 ): Promise<CommandResponse> => {
   const response = await api.post(`/api/v1/nodes/${nodeId}/commands`, command);

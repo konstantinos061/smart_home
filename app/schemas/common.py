@@ -23,8 +23,12 @@ class MeasurementPayload(BaseModel):
 class UplinkPayload(BaseModel):
     nodeId: str
     timestamp: datetime
-    measurements: List[MeasurementPayload]
+    data: str
     metadata: Optional[Dict[str, Any]] = None
+    rssi: Optional[int] = None
+    snr: Optional[float] = None
+    deviceInfo: Optional[Dict[str, Any]] = None
+    rxInfo: Optional[List[Dict[str, Any]]] = None
 
 
 class StatusEventPayload(BaseModel):
@@ -42,6 +46,8 @@ class CommandCreatePayload(BaseModel):
     payload: Dict[str, Any]
     requestedBy: Optional[str] = None
     expiresAt: Optional[datetime] = None
+    confirmed: bool = False
+    flushQueue: bool = True
 
 
 class NodeCreatePayload(BaseModel):
@@ -64,7 +70,9 @@ class StatusResponse(BaseModel):
 
 class CommandResponse(BaseModel):
     status: str
-    commandId: str
+    devEui: str
+    deviceQueueUrl: str
+    body: Dict[str, Any]
 
 
 class TelemetryResponse(BaseModel):

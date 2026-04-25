@@ -1,15 +1,13 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.util import defaultdict
 
 from app.api.deps import get_db
 from app.models import (
-    Alert,
-    Command,
     Node,
     NodeSensor,
     NodeStatusEvent,
@@ -28,8 +26,46 @@ from app.schemas import (
     SensorCreatePayload,
     UplinkPayload,
 )
+from app.services.downlink_encoder import encode_downlink_payload
+from app.services.payload_decoder import decode_payload
 
 router = APIRouter(prefix='/api/v1')
+
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: set[WebSocket] = set()
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.add(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.discard(websocket)
+
+    async def broadcast(self, message: dict):
+        disconnected = []
+        for connection in list(self.active_connections):
+            try:
+                await connection.send_json(message)
+            except Exception:
+                disconnected.append(connection)
+
+        for connection in disconnected:
+            self.disconnect(connection)
+
+
+connection_manager = ConnectionManager()
+
+
+@router.websocket('/ws')
+async def dashboard_websocket(websocket: WebSocket):
+    await connection_manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        connection_manager.disconnect(websocket)
 
 
 @router.get('/health', response_model=StatusResponse)
@@ -173,7 +209,12 @@ def get_all_nodes_latest(db: Session = Depends(get_db)):
 
 
 @router.post('/uplink', response_model=StatusResponse)
-def ingest_uplink(payload: UplinkPayload, db: Session = Depends(get_db)):
+async def ingest_uplink(payload: UplinkPayload, db: Session = Depends(get_db)):
+    try:
+        measurements = decode_payload(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     # 1. Upsert Node
     node = db.get(Node, payload.nodeId)
     if node is None:
@@ -183,7 +224,7 @@ def ingest_uplink(payload: UplinkPayload, db: Session = Depends(get_db)):
     node.last_seen_at = payload.timestamp
 
     # 2. Process Measurements
-    for measurement in payload.measurements:
+    for measurement in measurements:
         sensor = db.get(NodeSensor, measurement.sensorId)
         if sensor is None:
             sensor = NodeSensor(
@@ -200,7 +241,6 @@ def ingest_uplink(payload: UplinkPayload, db: Session = Depends(get_db)):
         if measurement.batteryPct is not None:
             sensor.battery_pct = measurement.batteryPct
 
-        # FIXED: Removed the non-existent 'sensor_type' argument
         telemetry = Telemetry(
             time=payload.timestamp,
             node_id=payload.nodeId,
@@ -216,7 +256,12 @@ def ingest_uplink(payload: UplinkPayload, db: Session = Depends(get_db)):
         )
         db.merge(telemetry)
 
-        db.commit()
+    db.commit()
+    await connection_manager.broadcast({
+        'type': 'uplink',
+        'nodeId': payload.nodeId,
+        'timestamp': payload.timestamp.isoformat(),
+    })
     return {'status': 'ok'}
 
 
@@ -362,15 +407,27 @@ def create_command(node_id: str, payload: CommandCreatePayload, db: Session = De
     if not node:
         raise HTTPException(status_code=404, detail='Node not found')
 
-    command = Command(
-        node_id=node_id,
-        requested_by=payload.requestedBy,
-        command_type=payload.commandType,
-        payload_json=payload.payload,
-        status='queued',
-        expires_at=payload.expiresAt,
-    )
-    db.add(command)
-    db.commit()
-    db.refresh(command)
-    return {'status': 'ok', 'commandId': str(command.command_id)}
+    try:
+        downlink = encode_downlink_payload(
+            payload.commandType,
+            payload.payload,
+            confirmed=payload.confirmed,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        'body': {
+            'flushQueue': payload.flushQueue,
+            'queueItem': {
+                'confirmed': downlink['confirmed'],
+                'data': downlink['data'],
+                'expiresAt': payload.expiresAt,
+                'fPort': downlink['fPort'],
+                'object': payload.payload,
+            },
+        },
+        'deviceQueueUrl': f'/api/devices/{node_id}/queue',
+        'devEui': node_id,
+        'status': 'ok',
+    }

@@ -167,11 +167,29 @@
   transform: scale(0.95);
 }
 
+.temp-control button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+.temp-control .apply-temp-button {
+  width: auto;
+  min-width: 64px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
 .temp-control .temp-value {
   font-size: 24px;
   font-weight: 700;
   flex: 1;
   text-align: center;
+}
+
+.command-message {
+  font-size: 12px;
+  opacity: 0.9;
 }
 
 .humidity-row,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getHealth, getAllNodesLatest, getAllSensors, deleteSensor, type NodeLatest, type Telemetry, type SensorInfo } from '../services/api';
+import { getHealth, getAllNodesLatest, getAllSensors, deleteSensor, getRealtimeUrl, type NodeLatest, type Telemetry, type SensorInfo } from '../services/api';
 import { DoorSensor } from '../components/sensors/DoorSensor';
 import { ThermostatSensor } from '../components/sensors/ThermostatSensor';
 import { PetSensor } from '../components/sensors/PetSensor';
@@ -19,26 +19,52 @@ export function Dashboard() {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
-    const fetchData = async () => {
+    let isMounted = true;
+
+    const fetchData = async (showLoading = false) => {
       try {
-        setLoading(true);
+        if (showLoading) {
+          setLoading(true);
+        }
+
         const [nodesData, sensorsData, healthData] = await Promise.all([
           getAllNodesLatest(),
           getAllSensors(),
           getHealth(),
         ]);
+
+        if (!isMounted) return;
+
         setNodes(nodesData);
         setAllSensors(sensorsData);
         setHealth(healthData);
+        setError(null);
       } catch (err) {
+        if (!isMounted) return;
+
         setError('Failed to load dashboard data');
         console.error(err);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchData();
+    fetchData(true);
+
+    const socket = new WebSocket(getRealtimeUrl());
+    socket.onmessage = () => {
+      fetchData(false);
+    };
+    socket.onerror = (err) => {
+      console.error('Dashboard WebSocket error', err);
+    };
+
+    return () => {
+      isMounted = false;
+      socket.close();
+    };
   }, []);
 
   const summary = useMemo(() => {
