@@ -1,25 +1,30 @@
 #include <Arduino.h>
-//#include <rn2xx3.h>
+#include <rn2xx3.h>
 #include <HardwareSerial.h>
 
 #define RECEPTION_TIME 10000
 #define FRAME_SIZE 60000
-#define READING_WINDOW 2000
-#define ACK_WINDOW 1000
+#define READING_WINDOW 3000
+#define ACK_WINDOW 2000
 #define GUARD_TIME 500
-#define BEACON_TIME 500
+#define BEACON_TIME 1000
 #define RST 21
+
+#define MAX_PAYLOAD_SIZE 64
+
+uint8_t sharedPayload[MAX_PAYLOAD_SIZE];
+uint8_t payloadLength = 0;
+
+SemaphoreHandle_t payloadMutex;
 
 //LoraWAn config
 #define RESET 23
 HardwareSerial loraWAN(1);
-//rn2xx3 myLoraWAN(loraWAN);
+rn2xx3 myLoraWAN(loraWAN);
 
 
 String str;
 HardwareSerial loraTDMA(2);
-
-
 
 struct Node {
     String devAddr;     
@@ -71,13 +76,14 @@ void TDMA_TaskManager(void * pvParameters){
     TickType_t period;
     while (xTaskGetTickCount() < (start_time + pdMS_TO_TICKS(BEACON_TIME)))
     {
+
       loraTDMA.println("radio tx 53594E435F424541434F4E"); //First send the beacon to everyone beacon = SYNC_BEACON
       str = loraTDMA.readStringUntil('\n');
       Serial.println("Lora module confirmed the recption of the instruction to send" + str); //Message stating ok I will start sending 
 
       str = loraTDMA.readStringUntil('\n');
       Serial.println("Becon as been sent: " + str); //Message sating I started the actual sending
-      vTaskDelay(100);
+      vTaskDelay(200);
     }
 
     for (int i = 0; i < totalNodes; i++) {
@@ -92,9 +98,11 @@ void TDMA_TaskManager(void * pvParameters){
 
         loraTDMA.println("radio rxstop");
         loraTDMA.readStringUntil('\n'); //clear the ok form this command
-        
+
         loraTDMA.println("radio rx 0"); 
         
+        
+
         period = xTaskGetTickCount();
         while (xTaskGetTickCount() < (period + pdMS_TO_TICKS(READING_WINDOW))){
 
@@ -104,8 +112,29 @@ void TDMA_TaskManager(void * pvParameters){
             str.trim();
 
             if (str.indexOf("radio_rx") == 0) {
+
+              const char* hexStart = str.c_str() + 10;
+              int hexStringLen = strlen(hexStart);
+              
               Serial.println("Success! Data: " + str);
               received_data = true;
+
+              if (xSemaphoreTake(payloadMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                  
+                  payloadLength = 0;
+                  for (int i = 0; i + 1 < hexStringLen; i += 2) {
+                      char byteStr[3] = { hexStart[i], hexStart[i+1], '\0' };
+                      sharedPayload[payloadLength++] = (uint8_t) strtol(byteStr, nullptr, 16);
+
+                      if (payloadLength >= MAX_PAYLOAD_SIZE) break;
+                  }
+                  
+                  xSemaphoreGive(payloadMutex);
+              }
+              if (LoraWANTaskHandle != NULL) {
+                xTaskNotifyGive(LoraWANTaskHandle);
+              }
+
               break;
             } 
             else if (str == "ok") {
@@ -129,24 +158,71 @@ void TDMA_TaskManager(void * pvParameters){
         
     }
     
-  
+    loraTDMA.println("radio rxstop");
     through_way_copy = start_time;
     xTaskDelayUntil(&through_way_copy, pdMS_TO_TICKS(FRAME_SIZE));
 
   }
 }
 
-/*
+
 void LoraWAN_TaskManager(void * pvParameters){
-  //Handle LoraWAN communication
-  //TODO
+
+  loraWAN.println("mac set class c");
+  String class_resp = loraWAN.readStringUntil('\n');
+
+  loraWAN.println("mac get class");
+  String LoraWanClass = loraWAN.readStringUntil('\n');
+  LoraWanClass.trim();
+  Serial.println("LoRaWAN set to Class C: " + LoraWanClass);
+
+  loraWAN.println("mac tx uncnf 1 000");
+
+  while(1){
+
+
+    if(loraWAN.available() > 0){
+      String incoming = loraWAN.readStringUntil('\n');
+      incoming.trim();
+      Serial.println("Data from LoraWAN " + incoming);
+    }
+
+    if(ulTaskNotifyTake(pdTRUE,0) > 0){
+      Serial.println("TDMA Task signaled me! Time to send Uplink.");
+
+      if(payloadLength > 0){
+          
+      if (xSemaphoreTake(payloadMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        
+        myLoraWAN.txBytes(sharedPayload, payloadLength);
+
+        payloadLength = 0; 
+
+        xSemaphoreGive(payloadMutex);
+      }
+      
+        
+      }
+    }
+
+    vTaskDelay(10);
+
+  /*
+  if(payloadLength > 0){
+    myLoraWAN.txBytes(sharedPayload, payloadLength);
+  }
 }
   */
+ vTaskDelay(10);
+  }
+  
+}
+
 
 //TODO::Add another task for downlink communication and instant actions
 //TODO::Handle teh actual data
 
-/*
+
 void initialize_LoraWAN_Radio()
 {
   //reset RN2xx3
@@ -159,20 +235,20 @@ void initialize_LoraWAN_Radio()
   loraWAN.flush();
 
   //check communication with radio
-  String hweui = myLora.hweui();
+  String hweui = myLoraWAN.hweui();
   while(hweui.length() != 16)
   {
     Serial.println("Communication with RN2xx3 unsuccessful. Power cycle the board.");
     Serial.println(hweui);
     delay(10000);
-    hweui = myLora.hweui();
+    hweui = myLoraWAN.hweui();
   }
 
   //print out the HWEUI so that we can register it via ttnctl
   Serial.println("When using OTAA, register this DevEUI: ");
   Serial.println(hweui);
   Serial.println("RN2xx3 firmware version:");
-  Serial.println(myLora.sysver());
+  Serial.println(myLoraWAN.sysver());
 
   //configure your keys and join the network
   Serial.println("Trying to join TTN");
@@ -182,19 +258,19 @@ void initialize_LoraWAN_Radio()
   //join_result = myLora.initABP("02017201", "8D7FFEF938589D95AAD928C2E2E7E48F", "AE17E567AECC8787F749A62F5541D522");
 
   //OTAA: initOTAA(String AppEUI, String AppKey);
-  /oin_result = myLora.initOTAA("A84041FDFEDC3FF1", "0000000000000000");
+  join_result = myLoraWAN.initOTAA("0000000000000000", "50e181018fd18b956a549e647699b288");
 
   while(!join_result)
   {
     Serial.println("Unable to join. Are your keys correct, and do you have TTN coverage?");
-    delay(60000); //delay a minute before retry
-    join_result = myLora.init();
+    delay(10000); //delay a minute before retry
+    join_result = myLoraWAN.initOTAA("0000000000000000", "50e181018fd18b956a549e647699b288");
   }
-  Serial.println("Successfully joined TTN");
+  Serial.println("Successfully joined LoraWAN");
 
 }
 
-*/
+
 void setup() {
   // start the serial monitor at the speed we set in the ini file
   Serial.begin(19200);
@@ -203,11 +279,37 @@ void setup() {
 
   loraTDMA.begin(57600, SERIAL_8N1, 16, 17);
 
-  //loraWAN.begin(57600, SERIAL_8N1, 18, 19);
+  payloadMutex = xSemaphoreCreateMutex();
 
-  //initialize_LoraWAN_Radio();
+  loraWAN.begin(57600, SERIAL_8N1, 18, 19);
 
-  //loraWAN.tx("TTN Mapper on ESP8266 node");
+  initialize_LoraWAN_Radio();
+
+
+  //TX_OK (1): Message sent, no downlink received.
+
+  //TX_WITH_RX (2): Message sent AND a downlink message was received from ChirpStack!
+
+  //TX_FAILED (0): Something went wrong (usually "busy" or "duty cycle" limits).
+
+
+  // while(1){
+  //     int tx_status = myLoraWAN.tx("Hello"); 
+
+  //     if(tx_status == 2) {
+       
+  //       String received = myLoraWAN.getRx(); 
+  //       Serial.println("SERVER DATA RECEIVED: " + received);
+  //     } 
+  //     else if(tx_status == 1) {
+  //       Serial.println("Sent successfully (No downlink).");
+  //     } 
+  //     else {
+  //       Serial.println("Send failed. Check connection or Duty Cycle.");
+  //     }
+
+  // delay(5000);
+  // }
 
   digitalWrite(RST, LOW);
   delay(200);
@@ -287,7 +389,7 @@ void setup() {
 
   Serial.println("starting loop");
   
-
+  
   //Create the task!
   xTaskCreatePinnedToCore(
     TDMA_TaskManager,         // Task function
@@ -298,9 +400,10 @@ void setup() {
     &TDMATaskHandle,  // Task handle
     1                  
   );
-
-  /*
+  
+  
    //LoraWANTask
+   
   xTaskCreatePinnedToCore(
     LoraWAN_TaskManager,         // Task function
     "LoraWAN_TaskManager",       // Task name
@@ -310,7 +413,8 @@ void setup() {
     &LoraWANTaskHandle,  // Task handle
     0                
   );
-  */
+  
+  
 
 
 }
