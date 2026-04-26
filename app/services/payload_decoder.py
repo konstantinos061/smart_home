@@ -6,12 +6,13 @@ from app.schemas import MeasurementPayload, UplinkPayload
 
 
 SENSOR_TYPE_MAP = {
-    0b00: 'thermostat',
-    0b01: 'door',
-    0b10: 'pet',
+    0b001: 'thermostat',
+    0b010: 'door',
+    0b011: "light",
+    0b100: 'pet',
 }
 
-THERMOSTAT_SCALE = 100.0
+THERMOSTAT_SCALE = 10.0
 SENSOR_RECORD_SIZE = 8
 
 
@@ -43,7 +44,7 @@ def _decode_sensor_record(
     snr: Optional[float],
 ) -> list[MeasurementPayload]:
     header = record[0]
-    sensor_type_code = (header >> 6) & 0b11
+    sensor_type_code = (header >> 5) & 0b111
     sensor_type = SENSOR_TYPE_MAP.get(sensor_type_code, 'unknown')
 
     if sensor_type == 'thermostat':
@@ -65,9 +66,9 @@ def _decode_thermostat(
     if len(raw_payload) != SENSOR_RECORD_SIZE:
         raise ValueError('Thermostat payload must be 9 bytes: header + temperature + humidity + set temperature + battery.')
 
-    current_temp = _read_signed_scaled(raw_payload[2:4])
-    humidity = _read_unsigned_scaled(raw_payload[4:5])
-    set_temp = _read_signed_scaled(raw_payload[5:7])
+    current_temp = _read_double_scaled(raw_payload[2:4])
+    humidity = _read_single_scaled(raw_payload[4:5])
+    set_temp = _read_double_scaled(raw_payload[5:7])
     battery_pct = _read_battery_pct(raw_payload[7])
 
     return [
@@ -152,12 +153,12 @@ def _decode_thermostat(
 #     ]
 
 
-def _read_signed_scaled(value: bytes) -> float:
-    return int.from_bytes(value, byteorder='big', signed=True) / THERMOSTAT_SCALE
-
-
-def _read_unsigned_scaled(value: bytes) -> float:
+def _read_double_scaled(value: bytes) -> float:
     return int.from_bytes(value, byteorder='big', signed=False) / THERMOSTAT_SCALE
+
+
+def _read_single_scaled(value: bytes) -> float:
+    return int.from_bytes(value, byteorder='big', signed=False)
 
 
 def _read_battery_pct(value: int) -> int:
