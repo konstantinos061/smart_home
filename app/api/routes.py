@@ -377,9 +377,10 @@ def get_sensors(
 def create_sensor(payload: SensorCreatePayload, db: Session = Depends(get_db)):
     # the type is based on the first 2 bits of the id, 00->thermostat, 01->door, 10->pet
     type_map = {
-        0b00: 'thermostat',
-        0b01: 'door',
-        0b10: 'pet',
+        0b001: 'thermostat',
+        0b010: 'door',
+        0b011: 'light',
+        0b100: 'pet'
     }
     
     # Extract the first 2 bits of the id to determine the type

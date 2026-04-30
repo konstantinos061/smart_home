@@ -31,9 +31,10 @@ export function AddSensorModal({ isOpen, onClose, onSensorAdded }: AddSensorModa
     // Extract the first 2 bits (bits 6-7)
     const typeBits = (id >> 6) & 0b11;
     const typeMap: Record<number, string> = {
-      0b00: 'thermostat',
-      0b01: 'door',
-      0b10: 'pet',
+      0b001: 'thermostat',
+      0b010: 'door',
+      0b011: 'light',
+      0b100: 'pet',
     };
     setSensorType(typeMap[typeBits] || 'unknown');
   }, [sensorId]);
