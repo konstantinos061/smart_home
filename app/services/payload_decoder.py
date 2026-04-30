@@ -3,17 +3,12 @@ import binascii
 from typing import Optional
 
 from app.schemas import MeasurementPayload, UplinkPayload
+from app.services.sensor_type_from_id import _sensor_type_from_sensor_id
 
-
-SENSOR_TYPE_MAP = {
-    0b001: 'thermostat',
-    0b010: 'door',
-    0b011: "light",
-    0b100: 'pet',
-}
 
 THERMOSTAT_SCALE = 10.0
 SENSOR_RECORD_SIZE = 8
+
 
 
 def decode_payload(payload: UplinkPayload) -> list[MeasurementPayload]:
@@ -45,12 +40,12 @@ def _decode_sensor_record(
 ) -> list[MeasurementPayload]:
     header = record[0]
     sensor_type_code = (header >> 5) & 0b111
-    sensor_type = SENSOR_TYPE_MAP.get(sensor_type_code, 'unknown')
+    sensor_type = _sensor_type_from_sensor_id(header)
 
     if sensor_type == 'thermostat':
         return _decode_thermostat(header, record, rssi, snr)
-    if sensor_type == 'light':
-        return _decode_light(header, record, rssi, snr)
+    if sensor_type == 'motion':
+        return _decode_motion(header, record, rssi, snr)
     # if sensor_type == 'door':
     #     return _decode_door(header, raw_payload, rssi, snr, battery_pct)
     # if sensor_type == 'pet':
@@ -66,7 +61,7 @@ def _decode_thermostat(
     snr: Optional[float],
 ) -> list[MeasurementPayload]:
     if len(raw_payload) != SENSOR_RECORD_SIZE:
-        raise ValueError('Thermostat payload must be 9 bytes: header + temperature + humidity + set temperature + battery.')
+        raise ValueError('Thermostat payload must be 8 bytes: header + temperature + humidity + set temperature + battery.')
 
     current_temp = _read_double_scaled(raw_payload[2:4])
     humidity = _read_single_scaled(raw_payload[4:5])
@@ -107,36 +102,36 @@ def _decode_thermostat(
     ]
 
 
-def _decode_light(
+def _decode_motion(
     sensor_id: int,
     raw_payload: bytes,
     rssi: Optional[int],
     snr: Optional[float],
 ) -> list[MeasurementPayload]:
     if len(raw_payload) != SENSOR_RECORD_SIZE:
-        raise ValueError('Light payload must be 9 bytes: header + brightness + battery.')
+        raise ValueError('Motion payload must be 8 bytes: header + motion + battery.')
 
-    motion = _read_single_scaled(raw_payload[1:2])
-    ledState = _read_single_scaled(raw_payload[2:3])
-    battery_pct = _read_battery_pct(raw_payload[4])
+    motionStatus = _read_single_scaled(raw_payload[1:2])
+    ledStatus = _read_single_scaled(raw_payload[2:3])
+    battery_pct = _read_battery_pct(raw_payload[3])
 
     return [
         MeasurementPayload(
             sensorId=sensor_id,
-            sensorType='light',
-            key='motion',
+            sensorType='motion',
+            key='motionStatus',
             unit='state',
-            value=motion,
+            value=motionStatus,
             batteryPct=battery_pct,
             rssi=rssi,
             snr=snr,
         ),
         MeasurementPayload(
             sensorId=sensor_id,
-            sensorType='light',
-            key='ledState',
+            sensorType='motion',
+            key='ledStatus',
             unit='state',
-            value=ledState,
+            value=ledStatus,
             batteryPct=battery_pct,
             rssi=rssi,
             snr=snr,

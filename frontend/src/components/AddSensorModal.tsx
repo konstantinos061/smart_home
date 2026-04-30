@@ -5,11 +5,11 @@ import './AddSensorModal.css';
 const SENSOR_TYPE_MAP: Record<number, string> = {
   0b001: 'thermostat',
   0b010: 'door',
-  0b011: 'light',
+  0b011: 'motion',
   0b100: 'pet',
 };
 
-const SENSOR_ID_RANGES = '32-63 thermostat, 64-95 door, 96-127 light, 128-159 pet';
+const SENSOR_ID_RANGES = '32-63 thermostat, 64-95 door, 96-127 motion, 128-159 pet';
 
 interface AddSensorModalProps {
   isOpen: boolean;
@@ -83,7 +83,7 @@ export function AddSensorModal({ isOpen, onClose, onSensorAdded }: AddSensorModa
   const typeColors: Record<string, string> = {
     'thermostat': '#FF6B6B',
     'door': '#4ECDC4',
-    'light': '#F5A623',
+    'motion': '#F5A623',
     'pet': '#95E1D3',
     'unknown': '#CCCCCC',
     'invalid': '#FFB6B6',

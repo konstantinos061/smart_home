@@ -29,20 +29,9 @@ from app.schemas import (
 from app.services.chirpstack import enqueue_device_queue_item
 from app.services.downlink_encoder import encode_downlink_payload
 from app.services.payload_decoder import decode_payload
+from app.services.sensor_type_from_id import _sensor_type_from_sensor_id
 
 router = APIRouter(prefix='/api/v1')
-
-SENSOR_TYPE_FROM_HEADER = {
-    0b001: 'thermostat',
-    0b010: 'door',
-    0b011: 'light',
-    0b100: 'pet',
-}
-
-
-def _sensor_type_from_sensor_id(sensor_id: int) -> str:
-    return SENSOR_TYPE_FROM_HEADER.get((sensor_id >> 5) & 0b111, 'unknown')
-
 
 class ConnectionManager:
     def __init__(self):
