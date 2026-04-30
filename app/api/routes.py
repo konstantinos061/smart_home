@@ -32,6 +32,17 @@ from app.services.payload_decoder import decode_payload
 
 router = APIRouter(prefix='/api/v1')
 
+SENSOR_TYPE_FROM_HEADER = {
+    0b001: 'thermostat',
+    0b010: 'door',
+    0b011: 'light',
+    0b100: 'pet',
+}
+
+
+def _sensor_type_from_sensor_id(sensor_id: int) -> str:
+    return SENSOR_TYPE_FROM_HEADER.get((sensor_id >> 5) & 0b111, 'unknown')
+
 
 class ConnectionManager:
     def __init__(self):
@@ -375,17 +386,11 @@ def get_sensors(
 
 @router.post('/sensors', response_model=StatusResponse)
 def create_sensor(payload: SensorCreatePayload, db: Session = Depends(get_db)):
-    # the type is based on the first 2 bits of the id, 00->thermostat, 01->door, 10->pet
-    type_map = {
-        0b001: 'thermostat',
-        0b010: 'door',
-        0b011: 'light',
-        0b100: 'pet'
-    }
-    
-    # Extract the first 2 bits of the id to determine the type
-    sensor_type = type_map.get((payload.id >> 6) & 0b11, 'unknown')  # Default to 'unknown' if it doesn't match
-    
+    # The sensor type lives in the 3 leftmost bits of the header byte.
+    sensor_type = _sensor_type_from_sensor_id(payload.id)
+    if sensor_type == 'unknown':
+        raise HTTPException(status_code=400, detail='Unsupported sensor ID prefix.')
+
     sensor = NodeSensor(
         id=payload.id,
         name=payload.name if payload.name else f'Sensor #{payload.id}',

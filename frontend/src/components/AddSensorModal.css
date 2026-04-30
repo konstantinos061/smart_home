@@ -87,6 +87,12 @@
   color: #333;
 }
 
+.form-hint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #666;
+}
+
 .form-group input {
   padding: 12px;
   border: 1px solid #ddd;

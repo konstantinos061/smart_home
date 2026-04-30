@@ -68,7 +68,7 @@ def main():
 
     # 1. Register our nodes
     nodes = [
-        {"id": "0004a30b0106480e", "name": "Test Node"},
+        {"id": "0004a30b01101ede", "name": "Test Node"},
         # {"id": "node-beta-002", "name": "Front Gate Controller"}
     ]
     

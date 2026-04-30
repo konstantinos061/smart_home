@@ -49,6 +49,8 @@ def _decode_sensor_record(
 
     if sensor_type == 'thermostat':
         return _decode_thermostat(header, record, rssi, snr)
+    if sensor_type == 'light':
+        return _decode_light(header, record, rssi, snr)
     # if sensor_type == 'door':
     #     return _decode_door(header, raw_payload, rssi, snr, battery_pct)
     # if sensor_type == 'pet':
@@ -104,6 +106,42 @@ def _decode_thermostat(
         ),
     ]
 
+
+def _decode_light(
+    sensor_id: int,
+    raw_payload: bytes,
+    rssi: Optional[int],
+    snr: Optional[float],
+) -> list[MeasurementPayload]:
+    if len(raw_payload) != SENSOR_RECORD_SIZE:
+        raise ValueError('Light payload must be 9 bytes: header + brightness + battery.')
+
+    motion = _read_single_scaled(raw_payload[1:2])
+    ledState = _read_single_scaled(raw_payload[2:3])
+    battery_pct = _read_battery_pct(raw_payload[4])
+
+    return [
+        MeasurementPayload(
+            sensorId=sensor_id,
+            sensorType='light',
+            key='motion',
+            unit='state',
+            value=motion,
+            batteryPct=battery_pct,
+            rssi=rssi,
+            snr=snr,
+        ),
+        MeasurementPayload(
+            sensorId=sensor_id,
+            sensorType='light',
+            key='ledState',
+            unit='state',
+            value=ledState,
+            batteryPct=battery_pct,
+            rssi=rssi,
+            snr=snr,
+        )
+    ]
 
 # def _decode_door(
 #     sensor_id: int,

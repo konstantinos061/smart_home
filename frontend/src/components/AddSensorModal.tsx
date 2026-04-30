@@ -2,6 +2,15 @@ import { useState, useEffect } from 'react';
 import { createSensor } from '../services/api';
 import './AddSensorModal.css';
 
+const SENSOR_TYPE_MAP: Record<number, string> = {
+  0b001: 'thermostat',
+  0b010: 'door',
+  0b011: 'light',
+  0b100: 'pet',
+};
+
+const SENSOR_ID_RANGES = '32-63 thermostat, 64-95 door, 96-127 light, 128-159 pet';
+
 interface AddSensorModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -15,7 +24,7 @@ export function AddSensorModal({ isOpen, onClose, onSensorAdded }: AddSensorModa
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Determine sensor type based on first 2 bits of ID
+  // Determine sensor type from the 3 leftmost bits of the sensor header byte.
   useEffect(() => {
     if (sensorId === '') {
       setSensorType('unknown');
@@ -28,15 +37,9 @@ export function AddSensorModal({ isOpen, onClose, onSensorAdded }: AddSensorModa
       return;
     }
 
-    // Extract the first 2 bits (bits 6-7)
-    const typeBits = (id >> 6) & 0b11;
-    const typeMap: Record<number, string> = {
-      0b001: 'thermostat',
-      0b010: 'door',
-      0b011: 'light',
-      0b100: 'pet',
-    };
-    setSensorType(typeMap[typeBits] || 'unknown');
+    // Extract the first 3 bits (bits 5-7)
+    const typeBits = (id >> 5) & 0b111;
+    setSensorType(SENSOR_TYPE_MAP[typeBits] || 'unknown');
   }, [sensorId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -80,6 +83,7 @@ export function AddSensorModal({ isOpen, onClose, onSensorAdded }: AddSensorModa
   const typeColors: Record<string, string> = {
     'thermostat': '#FF6B6B',
     'door': '#4ECDC4',
+    'light': '#F5A623',
     'pet': '#95E1D3',
     'unknown': '#CCCCCC',
     'invalid': '#FFB6B6',
@@ -106,6 +110,9 @@ export function AddSensorModal({ isOpen, onClose, onSensorAdded }: AddSensorModa
               placeholder="Enter sensor ID"
               disabled={loading}
             />
+            <div className="form-hint">
+              Type is determined by bits 7-5 of the ID byte: {SENSOR_ID_RANGES}.
+            </div>
             {sensorId !== '' && (
               <div className="type-display" style={{ borderColor: typeColors[sensorType] }}>
                 <span className="type-label">Sensor Type:</span>

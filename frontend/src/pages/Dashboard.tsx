@@ -3,6 +3,7 @@ import { getHealth, getAllNodesLatest, getAllSensors, deleteSensor, getRealtimeU
 import { DoorSensor } from '../components/sensors/DoorSensor';
 import { ThermostatSensor } from '../components/sensors/ThermostatSensor';
 import { PetSensor } from '../components/sensors/PetSensor';
+import { LightSensor } from '../components/sensors/LightSensor';
 import { AddSensorModal } from '../components/AddSensorModal';
 import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
 import './Dashboard.css';
@@ -198,8 +199,9 @@ export function Dashboard() {
           <h2 className="section-title">
             {sensorType === 'door' && '🚪 Doors'}
             {sensorType === 'thermostat' && '🌡️ Thermostats'}
+            {sensorType === 'light' && '💡 Light Sensors'}
             {sensorType === 'pet' && '🐾 Pet Sensors'}
-            {!['door', 'thermostat', 'pet'].includes(sensorType) && `📦 ${sensorType}`}
+            {!['door', 'thermostat', 'light', 'pet'].includes(sensorType) && `📦 ${sensorType}`}
           </h2>
 
           {sensorsMap.size > 0 ? (
@@ -269,6 +271,15 @@ export function Dashboard() {
                         nodeName={nodeName}
                         sensorId={sensorId}
                         latestData={sensorData[0]}
+                        onDelete={handleDeleteClick}
+                      />
+                    )}
+                    {sensorType === 'light' && (
+                      <LightSensor
+                        sensorName={sensorName}
+                        nodeName={nodeName}
+                        sensorId={sensorId}
+                        data={sensorData}
                         onDelete={handleDeleteClick}
                       />
                     )}
