@@ -36,15 +36,17 @@ HardwareSerial loraTDMA(2);
 
 struct Node {
     String devAddr;     
-    int slotTime;       
+    uint8_t slotTime;
+    int ID; 
+    byte Device_Type;      
 };
 
+uint8_t current_min_freeSlot = 4;
+
 Node network[] = {
-    {"DOOR_01", 1},    
-    {"TEMP_01", 2},   
-    {"LIGHT_01", 3},
-    {"LIGHT_02", 4},
-    {"LIGHT_03", 5}     
+    {"DOOR_01", 1, 0},    
+    {"TEMP_01", 2, 32},   
+    {"LIGHT_01", 3,0}    
 };
 
 int totalNodes = sizeof(network) / sizeof(network[0]);
@@ -52,6 +54,15 @@ int totalNodes = sizeof(network) / sizeof(network[0]);
 TaskHandle_t TDMATaskHandle = NULL;
 TaskHandle_t LoraWANTaskHandle = NULL;
 TaskHandle_t DownLinkTaskHandle = NULL;
+
+void Add_New_Node(uint8_t NodeID){
+
+  byte DeviceT = (NodeID >> 5) & 0x07;
+  int currentLength = sizeof(network) / sizeof(network[0]);
+
+  network[++currentLength] = {"OLA",current_min_freeSlot,NodeID, DeviceT};
+
+}
 
 void Send_ACK(TickType_t Starting_time_window){
 
@@ -172,7 +183,7 @@ void TDMA_TaskManager(void * pvParameters){
   }
 }
 
-
+/*
 
 void Downlink_TaskManager(void * pvParameters){
  
@@ -198,7 +209,7 @@ void Downlink_TaskManager(void * pvParameters){
 }
     
 }
-
+*/
 
 void LoraWAN_TaskManager(void * pvParameters){
 
@@ -219,25 +230,43 @@ void LoraWAN_TaskManager(void * pvParameters){
       String incoming = loraWAN.readStringUntil('\n');
       incoming.trim();
       Serial.println("Data from LoraWAN " + incoming);
-      //incoming = incoming.substring(9);
-      
-      const char* hexStart = incoming.c_str() + 9;
+ 
+      const char* a = incoming.c_str() + 9;
 
-      
-      int hexStringLen = strlen(hexStart);
+      char ID[3] = {a[0], a[1], '\0'};
+
+      uint8_t actual_ID = (uint8_t)strtol(ID, nullptr, 16);
+
+      Serial.print("Node ID of LoraWANMsg: ");
+      Serial.println(actual_ID);
+
+      bool new_node = true;
+
+      //Loop to check if the node is new
+      for(int i = 0; i < sizeof(network) / sizeof(network[0]); i++){
+        if(network[i].ID == actual_ID) new_node = false;
+      }
+      if(new_node) Add_New_Node(actual_ID);
+
+      //check if the message if for thermostat or door different behavior 
+    
+      a+=2;
+
+      int hexStringLen = strlen(a);
 
       payloadLength = 0;
       for (int i = 0; i + 1 < hexStringLen; i += 2) {
-          char byteStr[3] = { hexStart[i], hexStart[i+1], '\0' };
+          char byteStr[3] = { a[i], a[i+1], '\0' };
           DownlinkPayload[payloadLength++] = (uint8_t) strtol(byteStr, nullptr, 16);
 
           if (payloadLength >= MAX_PAYLOAD_SIZE) break;
       }
-      
+      /*
       if (DownLinkTaskHandle != NULL) {
         xTaskNotifyGive(DownLinkTaskHandle);
       }
-
+        
+      */
     }
       
 
@@ -246,14 +275,14 @@ void LoraWAN_TaskManager(void * pvParameters){
 
       if(payloadLength > 0){
           
-      if (xSemaphoreTake(payloadMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-        
-        //myLoraWAN.txBytes(sharedPayload, payloadLength);
+        if (xSemaphoreTake(payloadMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            
+            myLoraWAN.txBytes(sharedPayload, payloadLength);
 
-        payloadLength = 0; 
+            payloadLength = 0; 
 
-        xSemaphoreGive(payloadMutex);
-      }
+            xSemaphoreGive(payloadMutex);
+          }
       
         
       }
@@ -412,7 +441,7 @@ void setup() {
     &TDMATaskHandle,  // Task handle
     1                  
   );
-
+/*
   //Create the task!
   xTaskCreatePinnedToCore(
     Downlink_TaskManager,         // Task function
@@ -424,7 +453,7 @@ void setup() {
     1                  
   );
   
-  
+  */
    //LoraWANTask
    
   xTaskCreatePinnedToCore(
@@ -437,8 +466,6 @@ void setup() {
     0                
   );
   
-
-
 }
 
 void loop() {
