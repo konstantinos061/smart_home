@@ -29,6 +29,7 @@ frontend/*.local
 
 # Editor directories and files
 frontend/.vscode
+.vscode
 .idea
 .DS_Store
 *.suo
