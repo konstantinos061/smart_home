@@ -20,6 +20,8 @@ uint8_t DownlinkPayload[MAX_PAYLOAD_SIZE];
 
 uint8_t payloadLength = 0;
 
+uint8_t DownlinkPayloadLength = 0;
+
 
 
 
@@ -119,8 +121,6 @@ void TDMA_TaskManager(void * pvParameters){
 
         loraTDMA.println("radio rx 0"); 
         
-        
-
         period = xTaskGetTickCount();
         while (xTaskGetTickCount() < (period + pdMS_TO_TICKS(READING_WINDOW))){
 
@@ -194,22 +194,24 @@ void Downlink_TaskManager(void * pvParameters){
       loraTDMA.println("radio rxstop");
       loraTDMA.readStringUntil('\n');
 
-      String command = "radio tx ";
+      String command = "radio tx 00";
 
-      for (int i = 0; i < payloadLength; i++) {
+      for (int i = 0; i < DownlinkPayloadLength; i++) {
         char hexBuffer[3];
         sprintf(hexBuffer, "%02X", DownlinkPayload[i]);
         command += hexBuffer;
       }
 
+
+      Serial.println("COmmand to send via Lora: " + command);
     
-      for(int tries = 0; tries < 3; tries++){
+      for(int tries = 0; tries < 40; tries++){
         
         loraTDMA.println(command);
         loraTDMA.readStringUntil('\n');
         loraTDMA.readStringUntil('\n');
 
-        vTaskDelay(200);
+        vTaskDelay(500);
       }
         
 
@@ -230,6 +232,10 @@ void LoraWAN_TaskManager(void * pvParameters){
   Serial.println("LoRaWAN set to Class C: " + LoraWanClass);
 
   loraWAN.println("mac tx uncnf 1 000");
+
+  loraWAN.readStringUntil('\n');
+  loraWAN.readStringUntil('\n');
+
 
   while(1){
 
@@ -257,16 +263,15 @@ void LoraWAN_TaskManager(void * pvParameters){
       if(new_node) Add_New_Node(actual_ID);
 
       //check if the message if for thermostat or door different behavior 
-    
-
+  
       int hexStringLen = strlen(a);
 
-      payloadLength = 0;
+      DownlinkPayloadLength = 0;
       for (int i = 0; i + 1 < hexStringLen; i += 2) {
           char byteStr[3] = { a[i], a[i+1], '\0' };
-          DownlinkPayload[payloadLength++] = (uint8_t) strtol(byteStr, nullptr, 16);
+          DownlinkPayload[DownlinkPayloadLength++] = (uint8_t) strtol(byteStr, nullptr, 16);
 
-          if (payloadLength >= MAX_PAYLOAD_SIZE) break;
+          if (DownlinkPayloadLength >= MAX_PAYLOAD_SIZE) break;
       }
       
       if (DownLinkTaskHandle != NULL) {
