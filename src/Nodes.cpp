@@ -323,8 +323,21 @@ void Comms_TaskManager(void* pv) {
             if (loraSerial.available() > 0) {
                 String resp = loraSerial.readStringUntil('\n');
                 resp.trim();
-                Serial.println("Received in Rx task: " + resp);
-                break;
+
+                if (resp.indexOf("radio_rx") == 0) {
+                    Serial.println("Received from Gateway Downlink: " + resp);
+                    break;
+                } 
+                else if (resp == "ok") {
+                    Serial.println("Module is now listening...");
+                } 
+                else if (resp == "radio_err") {
+                    Serial.println("Slot Timeout: No signal heard.");
+                }
+                else {
+                    // Catch-all for weird garbage
+                    Serial.println("Unexpected: " + resp);
+                }
             }
             vTaskDelay(5);
         }
