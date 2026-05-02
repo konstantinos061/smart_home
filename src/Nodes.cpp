@@ -14,7 +14,7 @@
 #elif defined(NODE_LIGHT)
   #include "light_node.h"
 #elif defined(NODE_LOCK)
-  #include "lock_node.h"
+  #include "only_door.h"
 #else
   #error "No node type defined. Add -D NODE_THERMOSTAT, NODE_LIGHT, or NODE_LOCK to build_flags."
 #endif
