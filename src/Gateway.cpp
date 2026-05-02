@@ -183,7 +183,6 @@ void TDMA_TaskManager(void * pvParameters){
   }
 }
 
-/*
 
 void Downlink_TaskManager(void * pvParameters){
  
@@ -194,22 +193,31 @@ void Downlink_TaskManager(void * pvParameters){
       Serial.println("Sending downlink");
       loraTDMA.println("radio rxstop");
       loraTDMA.readStringUntil('\n');
-      
-      for(int tries = 0; tries < DOWNLINK_RETRIES; tries++){
-        
-        loraTDMA.println("radio tx AAAAAA");
 
-        loraTDMA.readStringUntil('\n');
-        loraTDMA.readStringUntil('\n');
+      String command = "radio tx ";
 
-        vTaskDelay(1000);
+      for (int i = 0; i < payloadLength; i++) {
+        char hexBuffer[3];
+        sprintf(hexBuffer, "%02X", DownlinkPayload[i]);
+        command += hexBuffer;
       }
+
+    
+      for(int tries = 0; tries < 3; tries++){
+        
+        loraTDMA.println(command);
+        loraTDMA.readStringUntil('\n');
+        loraTDMA.readStringUntil('\n');
+
+        vTaskDelay(200);
+      }
+        
 
     vTaskDelay(50);
 }
     
 }
-*/
+
 
 void LoraWAN_TaskManager(void * pvParameters){
 
@@ -250,7 +258,6 @@ void LoraWAN_TaskManager(void * pvParameters){
 
       //check if the message if for thermostat or door different behavior 
     
-      a+=2;
 
       int hexStringLen = strlen(a);
 
@@ -261,12 +268,12 @@ void LoraWAN_TaskManager(void * pvParameters){
 
           if (payloadLength >= MAX_PAYLOAD_SIZE) break;
       }
-      /*
+      
       if (DownLinkTaskHandle != NULL) {
         xTaskNotifyGive(DownLinkTaskHandle);
       }
         
-      */
+      
     }
       
 
@@ -441,7 +448,8 @@ void setup() {
     &TDMATaskHandle,  // Task handle
     1                  
   );
-/*
+  
+
   //Create the task!
   xTaskCreatePinnedToCore(
     Downlink_TaskManager,         // Task function
@@ -453,7 +461,7 @@ void setup() {
     1                  
   );
   
-  */
+  
    //LoraWANTask
    
   xTaskCreatePinnedToCore(

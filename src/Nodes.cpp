@@ -35,7 +35,7 @@
 // ---------------------------------------------------------------------------
 #define LORA_TX    17
 #define LORA_RX    16
-#define LORA_RST   25
+#define LORA_RST   21
 #define LORA_FREQ  "868100000"
 #define LORA_FREQ_RX "868300000"
 #define LORA_SF    "sf7"
@@ -178,7 +178,7 @@ static void handleDownlinkHex(const String& hex) {
         data[i] = (uint8_t)strtoul(hex.substring(4 + i * 2, 6 + i * 2).c_str(), nullptr, 16);
     }
 
-    nodeHandleDownlink(cmd, data, dataLen);
+    //nodeHandleDownlink(cmd, data, dataLen);
 }
 
 // ---------------------------------------------------------------------------
@@ -344,7 +344,7 @@ void setup() {
     Serial.printf("\n===== Node 0x%02X Starting =====\n", NODE_ID);
 
     // Node-specific hardware init
-    nodeSetup();
+    //nodeSetup();
 
     if (!loraInit()) {
         Serial.println("[ERROR] LoRa init failed — halting");

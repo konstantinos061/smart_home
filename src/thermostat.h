@@ -14,9 +14,9 @@
 #pragma once
 
 #include <Arduino.h>
-#include <DHT.h>
+//#include <DHT.h>
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
+//#include <LiquidCrystal_I2C.h>
 #include <Preferences.h>
 
 // -----------------------------------------------------------------------------
@@ -49,8 +49,8 @@
 // -----------------------------------------------------------------------------
 // Objects — defined here, used across the node
 // -----------------------------------------------------------------------------
-static DHT             _dht(PIN_DHT, DHT11);
-static LiquidCrystal_I2C _lcd(0x27, 16, 2);
+//static DHT             _dht(PIN_DHT, DHT11);
+//static LiquidCrystal_I2C _lcd(0x27, 16, 2);
 static Preferences     _prefs;
 
 // RTC memory — survives deep sleep
@@ -63,6 +63,7 @@ RTC_DATA_ATTR bool    thermoFirstBoot = true;
 // -----------------------------------------------------------------------------
 // Internal helpers
 // -----------------------------------------------------------------------------
+/*
 static float _readTemperature() {
     float t = _dht.readTemperature();
     return isnan(t) ? 0.0f : t;
@@ -141,6 +142,7 @@ void nodeSetup() {
  * Blocks until idle timeout, then saves setpoint to NVS and returns.
  * Called from main firmware on button wakeup.
  */
+/*
 void nodeRunUI() {
     Wire.begin(21, 22);
     _lcd.init();
@@ -182,7 +184,7 @@ void nodeRunUI() {
     _lcd.clear();
     _lcdBacklight(false);
 }
-
+*/
 /**
  * Read all sensors and build the uplink payload.
  *
@@ -198,6 +200,7 @@ void nodeRunUI() {
  * Caller must provide a buffer of at least 6 bytes.
  */
 void nodeBuildPayload(uint8_t nodeId, uint8_t* buf, uint8_t* len) {
+    /*
     _dht.begin();
     delay(DHT_STARTUP_MS);
     _dht.readTemperature();  // discard first read
@@ -213,21 +216,22 @@ void nodeBuildPayload(uint8_t nodeId, uint8_t* buf, uint8_t* len) {
 
     Serial.printf("[THERMO] Temp: %.1f°C  Hum: %.0f%%  Setpt: %.1f°C  Batt: %d%%\n",
                   temp, humidity, thermoSetPoint, battPct);
+    */
 
     buf[0] = nodeId;
     buf[1] = 0x01;
 
     // temperature
-    buf[2] = (temp_enc >> 8) & 0xFF;
-    buf[3] = temp_enc & 0xFF;
+    buf[2] = (10 >> 8) & 0xFF;
+    buf[3] = 200 & 0xFF;
 
-    buf[4] = (uint8_t)humidity;
+    buf[4] = (uint8_t)96;
 
     // setpoint
-    buf[5] = (set_enc >> 8) & 0xFF;
-    buf[6] = set_enc & 0xFF;
+    buf[5] = (5 >> 8) & 0xFF;
+    buf[6] = 5 & 0xFF;
 
-    buf[7] = (uint8_t)battPct;
+    buf[7] = (uint8_t)99;
 
     *len = 8;
 }
@@ -237,6 +241,7 @@ void nodeBuildPayload(uint8_t nodeId, uint8_t* buf, uint8_t* len) {
  *
  * CMD_SET_SETPOINT (0x01): data[0] = new setpoint in °C
  */
+/*
 void nodeHandleDownlink(uint8_t cmd, uint8_t* data, uint8_t dataLen) {
     if (cmd == CMD_SET_SETPOINT && dataLen >= 1) {
         thermoSetPoint = constrain((float)data[0], SETPOINT_MIN, SETPOINT_MAX);
@@ -246,3 +251,4 @@ void nodeHandleDownlink(uint8_t cmd, uint8_t* data, uint8_t dataLen) {
         Serial.printf("[THERMO] Setpoint updated to %.1f°C via downlink\n", thermoSetPoint);
     }
 }
+    */
