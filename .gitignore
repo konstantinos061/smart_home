@@ -36,3 +36,6 @@ frontend/*.local
 *.njsproj
 *.sln
 *.sw?
+
+#PIO
+.pio
