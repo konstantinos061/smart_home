@@ -5,7 +5,7 @@
 #define RECEPTION_TIME 10000
 #define FRAME_SIZE 60000
 #define READING_WINDOW 2000
-#define ACK_WINDOW 1000
+#define ACK_WINDOW 2000
 #define GUARD_TIME 500
 #define BEACON_TIME 1000
 #define RST 21
@@ -208,10 +208,12 @@ void Downlink_TaskManager(void * pvParameters){
       for(int tries = 0; tries < 40; tries++){
         
         loraTDMA.println(command);
-        loraTDMA.readStringUntil('\n');
-        loraTDMA.readStringUntil('\n');
 
-        vTaskDelay(500);
+        loraTDMA.readStringUntil('\n');
+        loraTDMA.readStringUntil('\n');
+      
+
+        vTaskDelay(50);
       }
         
 

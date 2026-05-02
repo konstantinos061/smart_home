@@ -26,7 +26,7 @@
 #define BEACON_WINDOW_MS    3000
 #define FIRST_LISTEN_MS     300000   // 5 min — always catches first beacon
 #define TX_WINDOW_MS        2000
-#define ACK_WINDOW_MS       1000
+#define ACK_WINDOW_MS       2000
 #define NEW_BEACON_MS       59500   // wait before re-entering beacon search
 #define SENSOR_PERIOD_MS    30000    // how often the sensor task reads
 
@@ -107,11 +107,12 @@ static bool listenForBeacon(uint32_t windowMs) {
     Serial.printf("[BEACON] Listening for %u ms...\n", windowMs);
     loraSerial.println("radio rxstop");
     loraSerial.readStringUntil('\n');
+
     loraSerial.println("radio rx 0");
 
     TickType_t start = xTaskGetTickCount();
     while (xTaskGetTickCount() < start + pdMS_TO_TICKS(windowMs)) {
-        if (loraSerial.available()) {
+        if (loraSerial.available() > 0) {
             String resp = loraSerial.readStringUntil('\n');
             resp.trim();
             if (resp.startsWith("radio_rx")) {
@@ -256,7 +257,6 @@ void Comms_TaskManager(void* pv) {
         for (int i = 0; i < g_payloadLen; i++) {
         Serial.printf("%X ", g_payload[i]);
         }
-
         char sending[64];
         sprintf(sending , "radio tx %02X%02X%02X%02X%02X%02X%02X%02X", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
         //Serial.println(hex_to_string(buf, len));
@@ -271,8 +271,8 @@ void Comms_TaskManager(void* pv) {
 
             vTaskDelay(10);
         }
-
-        loraSerial.println("radio rx 0");
+        
+        loraCmd("radio rx 0");
 
         //Read ACK
         Serial.println("\n--- Listening for ACK ---");
@@ -318,16 +318,23 @@ void Comms_TaskManager(void* pv) {
         Serial.println("\n--- RX window open ---");
         loraCmd("radio rxstop");
         loraCmd("radio rx 0");
-        TickType_t start_time = xTaskGetTickCount();
         while (1) {
+            
+            if (ulTaskNotifyTake(pdTRUE, 0) == 1) {
+                Serial.println("Restarting RX window");
+                loraCmd("radio rxstop");
+                loraCmd("radio rx 0");  // ← just restart, don't break
+            }
+
             if (loraSerial.available() > 0) {
+                Serial.println("waiting for any downlink");
                 String resp = loraSerial.readStringUntil('\n');
                 resp.trim();
 
                 if (resp.indexOf("radio_rx") == 0) {
-                    Serial.println("Received from Gateway Downlink: " + resp);
-                    break;
-                } 
+                    Serial.println("Shits in Rx Window: " + resp);
+                    
+                }
                 else if (resp == "ok") {
                     Serial.println("Module is now listening...");
                 } 
@@ -339,7 +346,7 @@ void Comms_TaskManager(void* pv) {
                     Serial.println("Unexpected: " + resp);
                 }
             }
-            vTaskDelay(5);
+            vTaskDelay(3);
         }
         loraCmd("radio rxstop");
          Serial.println("RX window closed");
