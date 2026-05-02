@@ -4,16 +4,24 @@
 
 #define RECEPTION_TIME 10000
 #define FRAME_SIZE 60000
-#define READING_WINDOW 3000
-#define ACK_WINDOW 2000
+#define READING_WINDOW 2000
+#define ACK_WINDOW 1000
 #define GUARD_TIME 500
 #define BEACON_TIME 1000
 #define RST 21
 
+#define DOWNLINK_RETRIES  3
+
 #define MAX_PAYLOAD_SIZE 64
 
 uint8_t sharedPayload[MAX_PAYLOAD_SIZE];
+
+uint8_t DownlinkPayload[MAX_PAYLOAD_SIZE];
+
 uint8_t payloadLength = 0;
+
+
+
 
 SemaphoreHandle_t payloadMutex;
 
@@ -43,6 +51,7 @@ int totalNodes = sizeof(network) / sizeof(network[0]);
 
 TaskHandle_t TDMATaskHandle = NULL;
 TaskHandle_t LoraWANTaskHandle = NULL;
+TaskHandle_t DownLinkTaskHandle = NULL;
 
 void Send_ACK(TickType_t Starting_time_window){
 
@@ -63,9 +72,7 @@ void Send_ACK(TickType_t Starting_time_window){
 
 
 void TDMA_TaskManager(void * pvParameters){
-  //TODO::Add something for scanning window 
  
-
   while(1){
     //First have to send the syncrhonization beacon every 60 seconds and then listen for the health informations
 
@@ -166,6 +173,33 @@ void TDMA_TaskManager(void * pvParameters){
 }
 
 
+
+void Downlink_TaskManager(void * pvParameters){
+ 
+  while(1){
+
+    ulTaskNotifyTake(pdTRUE,portMAX_DELAY);
+
+      Serial.println("Sending downlink");
+      loraTDMA.println("radio rxstop");
+      loraTDMA.readStringUntil('\n');
+      
+      for(int tries = 0; tries < DOWNLINK_RETRIES; tries++){
+        
+        loraTDMA.println("radio tx AAAAAA");
+
+        loraTDMA.readStringUntil('\n');
+        loraTDMA.readStringUntil('\n');
+
+        vTaskDelay(1000);
+      }
+
+    vTaskDelay(50);
+}
+    
+}
+
+
 void LoraWAN_TaskManager(void * pvParameters){
 
   loraWAN.println("mac set class c");
@@ -185,7 +219,27 @@ void LoraWAN_TaskManager(void * pvParameters){
       String incoming = loraWAN.readStringUntil('\n');
       incoming.trim();
       Serial.println("Data from LoraWAN " + incoming);
+      //incoming = incoming.substring(9);
+      
+      const char* hexStart = incoming.c_str() + 9;
+
+      
+      int hexStringLen = strlen(hexStart);
+
+      payloadLength = 0;
+      for (int i = 0; i + 1 < hexStringLen; i += 2) {
+          char byteStr[3] = { hexStart[i], hexStart[i+1], '\0' };
+          DownlinkPayload[payloadLength++] = (uint8_t) strtol(byteStr, nullptr, 16);
+
+          if (payloadLength >= MAX_PAYLOAD_SIZE) break;
+      }
+      
+      if (DownLinkTaskHandle != NULL) {
+        xTaskNotifyGive(DownLinkTaskHandle);
+      }
+
     }
+      
 
     if(ulTaskNotifyTake(pdTRUE,0) > 0){
       Serial.println("TDMA Task signaled me! Time to send Uplink.");
@@ -194,7 +248,7 @@ void LoraWAN_TaskManager(void * pvParameters){
           
       if (xSemaphoreTake(payloadMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         
-        myLoraWAN.txBytes(sharedPayload, payloadLength);
+        //myLoraWAN.txBytes(sharedPayload, payloadLength);
 
         payloadLength = 0; 
 
@@ -206,21 +260,10 @@ void LoraWAN_TaskManager(void * pvParameters){
     }
 
     vTaskDelay(10);
-
-  /*
-  if(payloadLength > 0){
-    myLoraWAN.txBytes(sharedPayload, payloadLength);
-  }
-}
-  */
- vTaskDelay(10);
+  
   }
   
 }
-
-
-//TODO::Add another task for downlink communication and instant actions
-//TODO::Handle teh actual data
 
 
 void initialize_LoraWAN_Radio()
@@ -251,13 +294,9 @@ void initialize_LoraWAN_Radio()
   Serial.println(myLoraWAN.sysver());
 
   //configure your keys and join the network
-  Serial.println("Trying to join TTN");
+  Serial.println("Trying to join ChirpStack");
   bool join_result = false;
 
-  //ABP: initABP(String addr, String AppSKey, String NwkSKey);
-  //join_result = myLora.initABP("02017201", "8D7FFEF938589D95AAD928C2E2E7E48F", "AE17E567AECC8787F749A62F5541D522");
-
-  //OTAA: initOTAA(String AppEUI, String AppKey);
   join_result = myLoraWAN.initOTAA("0000000000000000", "50e181018fd18b956a549e647699b288");
 
   while(!join_result)
@@ -285,36 +324,9 @@ void setup() {
 
   initialize_LoraWAN_Radio();
 
-
-  //TX_OK (1): Message sent, no downlink received.
-
-  //TX_WITH_RX (2): Message sent AND a downlink message was received from ChirpStack!
-
-  //TX_FAILED (0): Something went wrong (usually "busy" or "duty cycle" limits).
-
-
-  // while(1){
-  //     int tx_status = myLoraWAN.tx("Hello"); 
-
-  //     if(tx_status == 2) {
-       
-  //       String received = myLoraWAN.getRx(); 
-  //       Serial.println("SERVER DATA RECEIVED: " + received);
-  //     } 
-  //     else if(tx_status == 1) {
-  //       Serial.println("Sent successfully (No downlink).");
-  //     } 
-  //     else {
-  //       Serial.println("Send failed. Check connection or Duty Cycle.");
-  //     }
-
-  // delay(5000);
-  // }
-
   digitalWrite(RST, LOW);
   delay(200);
   digitalWrite(RST, HIGH);
-
 
 
   loraTDMA.setTimeout(1000);
@@ -396,8 +408,19 @@ void setup() {
     "TDMA_TaskManager",       // Task name
     10000,             // Stack size (bytes)
     NULL,              // Parameters
-    1,                 // Priority
+    2,                 // Priority
     &TDMATaskHandle,  // Task handle
+    1                  
+  );
+
+  //Create the task!
+  xTaskCreatePinnedToCore(
+    Downlink_TaskManager,         // Task function
+    "Downlink_TaskManager",       // Task name
+    10000,             // Stack size (bytes)
+    NULL,              // Parameters
+    1,                 // Priority
+    &DownLinkTaskHandle,  // Task handle
     1                  
   );
   
@@ -413,7 +436,6 @@ void setup() {
     &LoraWANTaskHandle,  // Task handle
     0                
   );
-  
   
 
 
