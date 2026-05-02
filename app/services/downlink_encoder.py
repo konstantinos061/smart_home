@@ -1,11 +1,12 @@
 import base64
 from typing import Any
-
+from app.services.encrypt_lora_packet import encrypt_lora_packet, SECRET_KEY
 
 DOWNLINK_FPORT = 1
 SET_TEMPERATURE_COMMAND = 0x01
 TEMPERATURE_SCALE = 100
 
+DOOR_COMMAND_SEQ_NO = 0
 
 def encode_downlink_payload(
     command_type: str,
@@ -13,6 +14,8 @@ def encode_downlink_payload(
     *,
     confirmed: bool = True,
 ) -> dict[str, Any]:
+    global DOOR_COMMAND_SEQ_NO
+
     if command_type == 'setTemperature':
         sensor_id = payload.get('sensorId')
         value = payload.get('value')
@@ -41,10 +44,13 @@ def encode_downlink_payload(
         if sensor_id < 64 or sensor_id > 95:
             raise ValueError('openDoor command requires a door sensorId between 64 and 95.')
 
-        payload_bytes = bytes([
-            sensor_id & 0xFF,
-            0x02,  # openDoor command code
-        ])
+        payload_bytes = encrypt_lora_packet(
+            node_id=sensor_id, 
+            sequence=DOOR_COMMAND_SEQ_NO, 
+            command=0x00FF, 
+            secret_key_hex=SECRET_KEY
+            )
+        DOOR_COMMAND_SEQ_NO += 1
 
     return {
         'fPort': DOWNLINK_FPORT,
