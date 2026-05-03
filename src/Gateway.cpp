@@ -40,16 +40,22 @@ struct Node {
     String devAddr;     
     uint8_t slotTime;
     int ID; 
-    byte Device_Type;      
+    byte Device_Type;
+    uint8_t n_connections_failures;      
 };
 
 uint8_t current_min_freeSlot = 4;
 
-Node network[] = {
-    {"DOOR_01", 1, 0},    
-    {"TEMP_01", 2, 32},   
-    {"LIGHT_01", 3,0}    
+uint8_t newJoiningNodeID = 64;
+bool new_joinee = false;
+
+Node network[5] = {
+    {"THERMO", 1, 0, 2,3},    
+    {"LIGHT", 2, 32,2,3},   
+    {"DOOR", 3,0,3,3},
+    {"NEW_DEVICE", 4,64,1,3}    
 };
+
 
 int totalNodes = sizeof(network) / sizeof(network[0]);
 
@@ -62,23 +68,52 @@ void Add_New_Node(uint8_t NodeID){
   byte DeviceT = (NodeID >> 5) & 0x07;
   int currentLength = sizeof(network) / sizeof(network[0]);
 
-  network[++currentLength] = {"OLA",current_min_freeSlot,NodeID, DeviceT};
+  network[++currentLength] = {"OLA",current_min_freeSlot,NodeID, DeviceT, 3};
+  current_min_freeSlot++;
+  new_joinee = true;
+  newJoiningNodeID = NodeID;
 
 }
 
-void Send_ACK(TickType_t Starting_time_window){
+void Delete_Offline_Node(uint8_t NodeID){
+
+  for(int i = 0; i < sizeof(network) / sizeof(network[0]); i++){
+    if (network[i].ID == NodeID){
+      current_min_freeSlot = network[i].slotTime;
+      new_joinee = false
+      network[i] = {"",0,0,0,0};
+      break;
+    }
+  }
+  
+
+}
+
+void Send_ACK(TickType_t Starting_time_window, byte Device_Type){
 
   Serial.println("Sending ACK!");
 
-  while(loraTDMA.available()) { loraTDMA.read(); } //clear the Lora
+  loraTDMA.println("radio rxstop");
+  loraTDMA.readStringUntil('\n');
 
   while(xTaskGetTickCount() < (Starting_time_window + pdMS_TO_TICKS(ACK_WINDOW))){
-    loraTDMA.println("radio tx 41434B"); //ACK
+
+    //If device is thremostat send data with ack
+    if(Device_Type == 1){
+      String AckPlusData = "radio tx 41434BAAAAAA";
+      for (int i = 0; i < DownlinkPayloadLength; i++) {
+        char hexBuffer[3];
+        sprintf(hexBuffer, "%02X", DownlinkPayload[i]);
+        AckPlusData += hexBuffer;
+      }
+      loraTDMA.println(AckPlusData); //ACK
+    }
+    else loraTDMA.println("radio tx 41434B"); //ACK
 
     str = loraTDMA.readStringUntil('\n');
     str = loraTDMA.readStringUntil('\n');
 
-    vTaskDelay(100);
+    vTaskDelay(50);
   }
 
 }
@@ -96,8 +131,19 @@ void TDMA_TaskManager(void * pvParameters){
     TickType_t period;
     while (xTaskGetTickCount() < (start_time + pdMS_TO_TICKS(BEACON_TIME)))
     {
+      if(!new_joinee) loraTDMA.println("radio tx 53594E435F424541434F4E"); //First send the beacon to everyone beacon = SYNC_BEACON
+      else {
+        String modified_beacon = "radio tx 53594E435F424541434F4E";
+        char hexBuffer[3];
+        sprintf(hexBuffer, "%02X", newJoiningNodeID);
+        modified_beacon += hexBuffer;
+        sprintf(hexBuffer, "%02X", current_min_freeSlot);
+        modified_beacon += hexBuffer;
+        Serial.println("New Joinee beacon: " + modified_beacon);
 
-      loraTDMA.println("radio tx 53594E435F424541434F4E"); //First send the beacon to everyone beacon = SYNC_BEACON
+        loraTDMA.println(modified_beacon); 
+      
+      }//First send the beacon to everyone beacon = SYNC_BEACON + 
       str = loraTDMA.readStringUntil('\n');
       Serial.println("Lora module confirmed the recption of the instruction to send" + str); //Message stating ok I will start sending 
 
@@ -149,9 +195,11 @@ void TDMA_TaskManager(void * pvParameters){
                   
                   xSemaphoreGive(payloadMutex);
               }
+              /*
               if (LoraWANTaskHandle != NULL) {
                 xTaskNotifyGive(LoraWANTaskHandle);
               }
+                */
 
               break;
             } 
@@ -171,8 +219,19 @@ void TDMA_TaskManager(void * pvParameters){
 
         }
         xTaskDelayUntil(&period, pdMS_TO_TICKS(READING_WINDOW));
+        vTaskDelay(100);
         period = xTaskGetTickCount();
-        if(received_data){Send_ACK(period);}
+        if(received_data){Send_ACK(period, network[i].Device_Type); 
+          network[i].n_connections_failures = 3;
+          if(network[i].ID == newJoiningNodeID) new_joinee = false;
+        }
+        else network[i].n_connections_failures--;
+
+        //Do the logic to update the fronend?
+        //if(network[i].n_connections_failures == 0) Delete_Offline_Node(network[i].ID);
+
+
+        //Discuss with colleagues the removal of a device then
         
     }
     
@@ -183,7 +242,7 @@ void TDMA_TaskManager(void * pvParameters){
   }
 }
 
-
+/*
 void Downlink_TaskManager(void * pvParameters){
  
   while(1){
@@ -253,6 +312,8 @@ void LoraWAN_TaskManager(void * pvParameters){
 
       uint8_t actual_ID = (uint8_t)strtol(ID, nullptr, 16);
 
+      byte DeviceT = (actual_ID >> 5) & 0x07;
+
       Serial.print("Node ID of LoraWANMsg: ");
       Serial.println(actual_ID);
 
@@ -275,9 +336,11 @@ void LoraWAN_TaskManager(void * pvParameters){
 
           if (DownlinkPayloadLength >= MAX_PAYLOAD_SIZE) break;
       }
+      if(DeviceT == 3){
       
-      if (DownLinkTaskHandle != NULL) {
-        xTaskNotifyGive(DownLinkTaskHandle);
+        if (DownLinkTaskHandle != NULL) {
+          xTaskNotifyGive(DownLinkTaskHandle);
+        }
       }
         
       
@@ -308,7 +371,7 @@ void LoraWAN_TaskManager(void * pvParameters){
   
 }
 
-
+*/
 void initialize_LoraWAN_Radio()
 {
   //reset RN2xx3
@@ -363,9 +426,9 @@ void setup() {
 
   payloadMutex = xSemaphoreCreateMutex();
 
-  loraWAN.begin(57600, SERIAL_8N1, 18, 19);
+  //loraWAN.begin(57600, SERIAL_8N1, 18, 19);
 
-  initialize_LoraWAN_Radio();
+  //initialize_LoraWAN_Radio();
 
   digitalWrite(RST, LOW);
   delay(200);
@@ -456,7 +519,7 @@ void setup() {
     1                  
   );
   
-
+  /*
   //Create the task!
   xTaskCreatePinnedToCore(
     Downlink_TaskManager,         // Task function
@@ -480,6 +543,7 @@ void setup() {
     &LoraWANTaskHandle,  // Task handle
     0                
   );
+  */
   
 }
 

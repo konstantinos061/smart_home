@@ -22,13 +22,14 @@
 // ---------------------------------------------------------------------------
 // TDMA timing
 // ---------------------------------------------------------------------------
-#define BEACON_INTERVAL_MS  60000
+#define BEACON_INTERVAL_MS  55000
 #define BEACON_WINDOW_MS    3000
 #define FIRST_LISTEN_MS     300000   // 5 min — always catches first beacon
 #define TX_WINDOW_MS        2000
 #define ACK_WINDOW_MS       2000
-#define NEW_BEACON_MS       59500   // wait before re-entering beacon search
+#define NEW_BEACON_MS       60000   // wait before re-entering beacon search
 #define SENSOR_PERIOD_MS    30000    // how often the sensor task reads
+#define COMMOM_SLOT_PERIOD  10000
 
 // ---------------------------------------------------------------------------
 // LoRa UART
@@ -44,6 +45,8 @@
 #define LORA_AFCBW "41.7"
 #define LORA_PWR   "14"
 #define LORA_SYNC  "12"
+
+//volatile uint32_t TRANS_SLOT_MS;
 
 HardwareSerial loraSerial(2);
 
@@ -105,61 +108,57 @@ static bool loraInit() {
 // ---------------------------------------------------------------------------
 static bool listenForBeacon(uint32_t windowMs) {
     Serial.printf("[BEACON] Listening for %u ms...\n", windowMs);
-    loraSerial.println("radio rxstop");
-    loraSerial.readStringUntil('\n');
 
-    loraSerial.println("radio rx 0");
+    loraCmd("radio rxstop");
+    loraCmd("radio rx 0");
 
     TickType_t start = xTaskGetTickCount();
     while (xTaskGetTickCount() < start + pdMS_TO_TICKS(windowMs)) {
+
+        //Could same probem as the downlink after reading somehting the radio just gives up!
         if (loraSerial.available() > 0) {
             String resp = loraSerial.readStringUntil('\n');
             resp.trim();
             if (resp.startsWith("radio_rx")) {
                 int spaceIdx = resp.lastIndexOf(' ');
+
                 if (spaceIdx >= 0 && resp.substring(spaceIdx + 1).startsWith("53")) {
-                    loraSerial.println("radio rxstop");
+                    
+                    String payload = resp.substring(spaceIdx + 1);
+
+                    //Check if not empty and so if that is the case means new slot to be attributed!
+                    if(payload.length() > 22){
+                        const char* trans_slot = payload.c_str() + 22;
+
+                        char ID[3] = {trans_slot[0], trans_slot[1], '\0'};
+
+                        uint8_t actual_ID = (uint8_t)strtol(ID, nullptr, 16);
+                       
+                        if(actual_ID == NODE_ID){
+                            trans_slot += 2;
+                            char ID[3] = {trans_slot[0], trans_slot[1], '\0'};
+                            uint8_t tSlot = (uint8_t)strtol(ID, nullptr, 16);
+                            
+                            //TRANS_SLOT_MS = tSlot * COMMOM_SLOT_PERIOD; 
+                        }
+                    }
+
+
+                    loraCmd("radio rxstop");
                     vTaskDelay(pdMS_TO_TICKS(50));
                     Serial.println("[BEACON] Received!");
                     return true;
                 }
             }
         }
+
         vTaskDelay(pdMS_TO_TICKS(5));
     }
 
-    loraSerial.println("radio rxstop");
+    loraCmd("radio rxstop");
     vTaskDelay(pdMS_TO_TICKS(50));
     Serial.println("[BEACON] Not received");
     return false;
-}
-
-// ---------------------------------------------------------------------------
-// Transmit a raw byte buffer over LoRa
-// ---------------------------------------------------------------------------
-static void sendPacket(const uint8_t* buf, uint8_t len) {
-    String cmd = "radio tx ";
-    for (uint8_t i = 0; i < len; i++) {
-        char hex[3];
-        sprintf(hex, "%02X", buf[i]);
-        cmd += hex;
-    }
-
-    String resp = loraCmd(cmd, 500);
-    if (resp != "ok") {
-        Serial.printf("[NODE 0x%02X] TX start failed: %s\n", NODE_ID, resp.c_str());
-        return;
-    }
-
-    loraSerial.setTimeout(3000);
-    resp = loraSerial.readStringUntil('\n');
-    resp.trim();
-    if (resp == "radio_tx_ok") {
-        Serial.printf("[NODE 0x%02X] TX OK (%d bytes)\n", NODE_ID, len);
-    } else {
-        Serial.printf("[NODE 0x%02X] TX failed: %s\n", NODE_ID, resp.c_str());
-    }
-    loraSerial.setTimeout(2000);
 }
 
 // ---------------------------------------------------------------------------
@@ -231,6 +230,7 @@ void Comms_TaskManager(void* pv) {
 
             if (!beaconReceived) {
                 Serial.println("[BEACON] Retrying in 60 s...");
+                //Fix this because the retrying cnat be in 60sec
                 vTaskDelay(pdMS_TO_TICKS(BEACON_INTERVAL_MS));
                 if (!loraInit()) Serial.println("[ERROR] LoRa re-init failed");
             }
@@ -266,6 +266,7 @@ void Comms_TaskManager(void* pv) {
         while(xTaskGetTickCount() < (period + pdMS_TO_TICKS(TX_WINDOW_MS))) {
             
             loraSerial.println(sending);
+
             loraSerial.readStringUntil('\n');
             loraSerial.readStringUntil('\n');
 
@@ -279,10 +280,8 @@ void Comms_TaskManager(void* pv) {
         period = xTaskGetTickCount();
         while(xTaskGetTickCount() < (period + pdMS_TO_TICKS(ACK_WINDOW_MS))) {
 
-            
             if(loraSerial.available() > 0){
                 String str = loraSerial.readStringUntil('\n');
-                Serial.println("str from lora: " + str);
                 str.trim();
 
                 if (str.indexOf("radio_rx") == 0) {
@@ -319,11 +318,11 @@ void Comms_TaskManager(void* pv) {
         loraCmd("radio rxstop");
         loraCmd("radio rx 0");
         while (1) {
-            
+
             if (ulTaskNotifyTake(pdTRUE, 0) == 1) {
                 Serial.println("Restarting RX window");
                 loraCmd("radio rxstop");
-                loraCmd("radio rx 0");  // ← just restart, don't break
+                loraCmd("radio rx 0");  
             }
 
             if (loraSerial.available() > 0) {
