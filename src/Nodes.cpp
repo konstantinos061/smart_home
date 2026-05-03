@@ -27,7 +27,7 @@
 #define FIRST_LISTEN_MS     300000   // 5 min — always catches first beacon
 #define TX_WINDOW_MS        2000
 #define ACK_WINDOW_MS       2000
-#define NEW_BEACON_MS       60000   // wait before re-entering beacon search
+#define NEW_BEACON_MS       59500   // wait before re-entering beacon search
 #define SENSOR_PERIOD_MS    30000    // how often the sensor task reads
 #define COMMOM_SLOT_PERIOD  10000
 
@@ -90,6 +90,7 @@ static bool loraInit() {
     String r;
     r = loraCmd("radio set mod lora");         if (r != "ok") { Serial.println("[LORA] mod lora -> "  + r); return false; }
     r = loraCmd("radio set freq " LORA_FREQ);  if (r != "ok") { Serial.println("[LORA] freq -> "      + r); return false; }
+    r = loraCmd("radio set wdt 0");            if (r != "ok") { Serial.println("[LORA] wdt -> "      + r);  return false;  }
     r = loraCmd("radio set pwr "  LORA_PWR);   if (r != "ok") { Serial.println("[LORA] pwr -> "       + r); return false; }
     r = loraCmd("radio set sf "   LORA_SF);    if (r != "ok") { Serial.println("[LORA] sf -> "        + r); return false; }
     r = loraCmd("radio set afcbw " LORA_AFCBW);if (r != "ok") { Serial.println("[LORA] afcbw -> "     + r); return false; }
@@ -149,6 +150,11 @@ static bool listenForBeacon(uint32_t windowMs) {
                     Serial.println("[BEACON] Received!");
                     return true;
                 }
+            }
+            else if(resp.startsWith("radio_err")){
+                Serial.println("I am too much time lostening this happens!");
+                loraCmd("radio rxstop");
+                loraCmd("radio rx 0");
             }
         }
 
@@ -252,11 +258,6 @@ void Comms_TaskManager(void* pv) {
 
         //Serial.printf("[NODE %d] Payload ready (%d bytes)\n", NODE_ID, len);
 
-        Serial.println("\n--- Handling windows ---");
-
-        for (int i = 0; i < g_payloadLen; i++) {
-        Serial.printf("%X ", g_payload[i]);
-        }
         char sending[64];
         sprintf(sending , "radio tx %02X%02X%02X%02X%02X%02X%02X%02X", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
         //Serial.println(hex_to_string(buf, len));
@@ -339,6 +340,8 @@ void Comms_TaskManager(void* pv) {
                 } 
                 else if (resp == "radio_err") {
                     Serial.println("Slot Timeout: No signal heard.");
+                    loraCmd("radio rxstop");
+                    loraCmd("radio rx 0"); 
                 }
                 else {
                     // Catch-all for weird garbage

@@ -49,7 +49,7 @@ uint8_t current_min_freeSlot = 4;
 uint8_t newJoiningNodeID = 64;
 bool new_joinee = false;
 
-Node network[5] = {
+Node network[] = {
     {"THERMO", 1, 0, 2,3},    
     {"LIGHT", 2, 32,2,3},   
     {"DOOR", 3,0,3,3},
@@ -74,13 +74,13 @@ void Add_New_Node(uint8_t NodeID){
   newJoiningNodeID = NodeID;
 
 }
-
+/*
 void Delete_Offline_Node(uint8_t NodeID){
 
   for(int i = 0; i < sizeof(network) / sizeof(network[0]); i++){
     if (network[i].ID == NodeID){
       current_min_freeSlot = network[i].slotTime;
-      new_joinee = false
+      new_joinee = false;
       network[i] = {"",0,0,0,0};
       break;
     }
@@ -88,6 +88,7 @@ void Delete_Offline_Node(uint8_t NodeID){
   
 
 }
+  */
 
 void Send_ACK(TickType_t Starting_time_window, byte Device_Type){
 
@@ -151,7 +152,7 @@ void TDMA_TaskManager(void * pvParameters){
       Serial.println("Becon as been sent: " + str); //Message sating I started the actual sending
       vTaskDelay(200);
     }
-
+   
     for (int i = 0; i < totalNodes; i++) {
         bool received_data = false; 
         int targetWake = network[i].slotTime * RECEPTION_TIME - GUARD_TIME;
@@ -218,14 +219,19 @@ void TDMA_TaskManager(void * pvParameters){
           vTaskDelay(pdMS_TO_TICKS(5));
 
         }
+      
         xTaskDelayUntil(&period, pdMS_TO_TICKS(READING_WINDOW));
-        vTaskDelay(100);
+    
+     
+        vTaskDelay(500);
+
         period = xTaskGetTickCount();
         if(received_data){Send_ACK(period, network[i].Device_Type); 
           network[i].n_connections_failures = 3;
           if(network[i].ID == newJoiningNodeID) new_joinee = false;
         }
         else network[i].n_connections_failures--;
+
 
         //Do the logic to update the fronend?
         //if(network[i].n_connections_failures == 0) Delete_Offline_Node(network[i].ID);
@@ -234,8 +240,8 @@ void TDMA_TaskManager(void * pvParameters){
         //Discuss with colleagues the removal of a device then
         
     }
-    
     loraTDMA.println("radio rxstop");
+    
     through_way_copy = start_time;
     xTaskDelayUntil(&through_way_copy, pdMS_TO_TICKS(FRAME_SIZE));
 
