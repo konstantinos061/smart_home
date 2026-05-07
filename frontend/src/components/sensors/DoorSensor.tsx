@@ -15,7 +15,7 @@ export function DoorSensor({ sensorName, nodeName, sensorId, data, onDelete }: D
   const succTries = data
     .filter(d => d.key === 'successfulAttempts')
     .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
-  const failedTried = data
+  const failedTries = data
     .filter(d => d.key === 'failedAttempts')
     .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
   const [showHistory, setShowHistory] = useState(false);
@@ -102,7 +102,7 @@ export function DoorSensor({ sensorName, nodeName, sensorId, data, onDelete }: D
               </div>
               <div className="state-label">Impostors</div>
               <div className={`state-value unlocked`}>
-                {succTries.valueNumeric}
+                {failedTries.valueNumeric}
               </div>
             </div>
           </div>
