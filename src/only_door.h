@@ -12,6 +12,14 @@
 #include "mbedtls/gcm.h"
 
 // -----------------------------------------------------------------------------
+// OVERRIDE ΓΙΑ ΝΑ ΔΟΥΛΕΥΕΙ ΤΟ KEYPAD ΧΩΡΙΣ ΝΑ ΠΕΙΡΑΞΟΥΜΕ ΤΟ Nodes.cpp
+// -----------------------------------------------------------------------------
+#ifdef SENSOR_PERIOD_MS
+  #undef SENSOR_PERIOD_MS
+  #define SENSOR_PERIOD_MS 30 
+#endif
+
+// -----------------------------------------------------------------------------
 // Pin definitions 
 // -----------------------------------------------------------------------------
 #define PIN_RELAY      15  // Αποφεύγουμε το 14 λόγω Keypad
@@ -81,7 +89,7 @@ void nodeSetup() {
     Serial.println("[LOCK] Hardware init OK (locked)");
 }
 
-// Χτίζει το Uplink Payload (3 Bytes) και ελέγχει τους σένσορες
+// Χτίζει το Uplink Payload (3 Bytes + 5 Bytes Padding) και ελέγχει τους σένσορες
 void nodeBuildPayload(uint8_t nodeId, uint8_t* buf, uint8_t* len) {
     
     // --- 1. ΕΚΤΕΛΕΣΗ ΛΟΓΙΚΗΣ ΠΟΡΤΑΣ (POLLING) ---
@@ -108,7 +116,7 @@ void nodeBuildPayload(uint8_t nodeId, uint8_t* buf, uint8_t* len) {
         else { enteredPin += key; }
     }
 
-    if (currentState == SYS_IDLE && mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
+    if (currentState == SYS_IDLE && mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) { 
         String scannedUid = "";
         for (byte i = 0; i < mfrc522.uid.size; i++) {
             scannedUid += String(mfrc522.uid.uidByte[i] < 0x10 ? "0" : "");
@@ -124,17 +132,35 @@ void nodeBuildPayload(uint8_t nodeId, uint8_t* buf, uint8_t* len) {
         }
     }
 
-    // --- 2. ΔΗΜΙΟΥΡΓΙΑ PAYLOAD (Ακριβώς 3 Bytes) ---
+    // --- 2. ΔΗΜΙΟΥΡΓΙΑ PAYLOAD (Συμβατό με την sprintf του Nodes.cpp) ---
     buf[0] = nodeId;
     buf[1] = success_openings;
     buf[2] = unsuccessful_attempts;
     
-    *len = 3; 
+    // Padding με μηδενικά για να μην στείλει σκουπίδια το Nodes.cpp
+    buf[3] = 0x00; 
+    buf[4] = 0x00; 
+    buf[5] = 0x00; 
+    buf[6] = 0x00; 
+    buf[7] = 0x00;
+    
+    *len = 8; 
 }
 
-// Λαμβάνει και αποκρυπτογραφεί τα 11 bytes του Downlink
-void nodeHandleDownlink(const uint8_t* packet, uint8_t len) {
-    if (len < 11) {
+// Προσαρμοσμένη υπογραφή για να ταιριάζει με την κλήση του Nodes.cpp
+void nodeHandleDownlink(uint8_t cmd, uint8_t* data, uint8_t dataLen) {
+    
+    // Ανακατασκευή του "packet" για να δουλέψει ο δικός σου κώδικας από κάτω ανέπαφος
+    uint8_t packet[16] = {0};
+    packet[0] = NODE_ID; 
+    packet[1] = cmd;
+    memcpy(&packet[2], data, dataLen);
+
+    // Ο συνολικός αριθμός των bytes (NodeID + cmd + data)
+    uint8_t totalLen = dataLen + 2; 
+
+    // --- ΑΠΟ ΕΔΩ ΚΑΙ ΚΑΤΩ ΕΙΝΑΙ Ο ΔΙΚΟΣ ΣΟΥ ΚΩΔΙΚΑΣ (Χωρίς καμία αλλαγή) ---
+    if (totalLen < 11) {
         Serial.println("[SECURITY] Error: Downlink Packet too short");
         return;
     }
