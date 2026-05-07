@@ -387,6 +387,18 @@ def create_sensor(payload: SensorCreatePayload, db: Session = Depends(get_db)):
     )
     db.add(sensor)
     db.commit()
+
+    # Send to the LoRa Gateway (node) the new sensor_id
+    create_command(
+        node_id='0004a30b01101ede', # hardcoded for proof of concept! (quick solution)
+        payload=CommandCreatePayload(
+            commandType='addSensor',
+            payload={
+                'sensorId': payload.id,
+                'addCommand': True
+            }
+        )
+    )
     return {'status': 'ok'}
 
 

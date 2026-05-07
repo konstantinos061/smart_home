@@ -52,6 +52,27 @@ def encode_downlink_payload(
             )
         DOOR_COMMAND_SEQ_NO += 1
 
+    if command_type == 'addSensor':
+        sensor_id = payload.get('sensorId')
+        add_bool = payload.get('addCommand')
+        
+        if not isinstance(sensor_id, int):
+            raise ValueError('addSensor command payload must include integer sensorId.')
+        if not isinstance(add_bool, bool):
+            raise ValueError('addSensor command payload must include boolean addCommand.')
+
+        add_cmd = 0x00
+        if add_bool:
+            add_cmd = 0x01
+        else:
+            add_cmd = 0x00
+
+        payload_bytes = bytes([ 
+            sensor_id & 0xFF,
+            add_cmd & 0xFF
+        ])
+        
+
     return {
         'fPort': DOWNLINK_FPORT,
         'confirmed': confirmed,
