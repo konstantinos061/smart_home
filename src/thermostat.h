@@ -14,14 +14,10 @@
 #pragma once
 
 #include <Arduino.h>
-//#include <DHT.h>
 #include <Wire.h>
-//#include <LiquidCrystal_I2C.h>
 #include <Preferences.h>
 #include <DHT.h>
 #include <LiquidCrystal_I2C.h>
-
-#define tlog(fmt, ...) Serial.printf("[%6lu ms] " fmt, millis(), ##__VA_ARGS__)
 
 // -----------------------------------------------------------------------------
 // Pin definitions
@@ -38,6 +34,7 @@
 // Configuration
 // -----------------------------------------------------------------------------
 #define DHT_STARTUP_MS  2500
+#define BEACON_FRAME_MS 59500  // must match NEW_BEACON_MS in Thermostat.cpp
 #define SETPOINT_MIN    15
 #define SETPOINT_MAX    30
 #define UI_TIMEOUT_MS   10000
@@ -58,6 +55,8 @@ static DHT               _dht(PIN_DHT, DHT11);
 static LiquidCrystal_I2C _lcd(0x27, 16, 2);
 
 static Preferences     _prefs;
+
+extern volatile bool g_uiActive;
 
 // RTC memory — survives deep sleep
 extern RTC_DATA_ATTR float    thermoSetPoint;
@@ -111,7 +110,7 @@ static float _readEncoder() {
     int dt  = digitalRead(PIN_ENC_DT);
     float delta = 0.0f;
     if (clk != lastClk && clk == LOW) {
-        delta = (dt != clk) ? -0.5f : +0.5f;
+        delta = (dt != clk) ? -0.1f : +0.1f;
     }
     lastClk = clk;
     return delta;
@@ -131,7 +130,7 @@ void nodeSetup() {
         thermoSetPoint = _prefs.getFloat("setpt", 20.0f);
         _prefs.end();
         thermoFirstBoot = false;
-        tlog("[THERMO] Loaded setpoint %.1f°C from NVS\n", thermoSetPoint);
+        Serial.printf("[THERMO] Loaded setpoint %.1f°C from NVS\n", thermoSetPoint);
     }
     Wire.begin(PIN_LCD_SDA, PIN_LCD_SCL);
     _lcd.init();
@@ -145,6 +144,7 @@ void nodeSetup() {
  */
 
 void nodeRunUI() {
+    g_uiActive = true;
     Wire.begin(PIN_LCD_SDA, PIN_LCD_SCL);
     _lcd.init();
     _lcd.backlight();
@@ -166,7 +166,7 @@ void nodeRunUI() {
             _prefs.begin("thermo", false);
             _prefs.putFloat("setpt", thermoSetPoint);
             _prefs.end();
-            tlog("[THERMO] Setpoint saved, closing UI\n");
+            Serial.printf("[THERMO] Setpoint saved, closing UI\n");
             break;
         }
 
@@ -175,7 +175,7 @@ void nodeRunUI() {
             thermoSetPoint = constrain(thermoSetPoint + delta, SETPOINT_MIN, SETPOINT_MAX);
             _displaySetPointScreen(temp, thermoSetPoint);
             lastActivity = millis();
-            tlog("[THERMO] Setpoint -> %.1f°C\n", thermoSetPoint);
+            Serial.printf("[THERMO] Setpoint -> %.1f°C\n", thermoSetPoint);
         }
 
         delay(5);
@@ -183,12 +183,13 @@ void nodeRunUI() {
 
     _lcd.clear();
     _lcd.noBacklight();
+    g_uiActive = false;
 }
 
 /*
  * Read all sensors and build the uplink payload.
  *
- * Payload format (6 bytes):
+ * Payload format (8 bytes):
  *   [0] NODE_ID
  *   [1] 0x01 (uplink marker)
  *   [2] temp * 2  (0.5°C resolution)
@@ -214,23 +215,17 @@ void nodeBuildPayload(uint8_t nodeId, uint8_t* buf, uint8_t* len) {
     int16_t temp_enc = encodeTemp10(temp);
     int16_t set_enc  = encodeTemp10(thermoSetPoint);
 
-    tlog("[THERMO] Temp: %.1f°C  Hum: %.0f%%  Setpt: %.1f°C  Batt: %d%%\n",
+    Serial.printf("[THERMO] Temp: %.1f°C  Hum: %.0f%%  Setpt: %.1f°C  Batt: %d%%\n",
          temp, humidity, thermoSetPoint, battPct);
 
     buf[0] = nodeId;
     buf[1] = 0x01;
-
-    // temperature
-    buf[2] = (10 >> 8) & 0xFF;
-    buf[3] = 200 & 0xFF;
-
-    buf[4] = (uint8_t)96;
-
-    // setpoint
-    buf[5] = (5 >> 8) & 0xFF;
-    buf[6] = 5 & 0xFF;
-
-    buf[7] = (uint8_t)99;
+    buf[2] = (temp_enc >> 8) & 0xFF;
+    buf[3] = temp_enc & 0xFF;
+    buf[4] = (uint8_t)humidity;
+    buf[5] = (set_enc >> 8) & 0xFF;
+    buf[6] = set_enc & 0xFF;
+    buf[7] = (uint8_t)battPct;
 
     *len = 8;
 }
@@ -250,7 +245,7 @@ void nodeHandleDownlink(uint8_t cmd, uint8_t* data, uint8_t dataLen) {
         _prefs.begin("thermo", false);
         _prefs.putFloat("setpt", thermoSetPoint);
         _prefs.end();
-        tlog("[THERMO] Setpoint updated to %.1f°C via downlink\n", thermoSetPoint);
+        Serial.printf("[THERMO] Setpoint updated to %.1f°C via downlink\n", thermoSetPoint);
     }
 }
 
@@ -271,7 +266,7 @@ RTC_DATA_ATTR uint32_t g_sleepMs        = 0;  // how long we planned to sleep (m
 void nodeGoSleep(uint32_t sleepMs) {
     g_sleepStartTick = rtc_time_get();
     g_sleepMs        = sleepMs;
-    tlog("[SLEEP] %u ms\n", sleepMs);
+    Serial.printf("[SLEEP] %u ms\n", sleepMs);
     Serial.flush();
     esp_sleep_enable_timer_wakeup((uint64_t)sleepMs * 1000ULL);
     esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_ENC_SW, 0);  // press = LOW
@@ -281,17 +276,6 @@ void nodeGoSleep(uint32_t sleepMs) {
 // Check wakeup cause. If the encoder button was pressed, run the UI and return true.
 bool nodeHandleWakeup() {
     if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) {
-        nodeSetup();
-        nodeRunUI();
-        // rtc_time_get() keeps counting through deep sleep — measure true elapsed time
-        uint64_t elapsedTicks = rtc_time_get() - g_sleepStartTick;
-        uint32_t hz           = rtc_clk_slow_freq_get_hz();
-        uint32_t elapsedMs    = (uint32_t)(elapsedTicks * 1000ULL / hz);
-        tlog("[WAKEUP] slept+UI = %u ms of planned %u ms\n", elapsedMs, g_sleepMs);
-        // If more than 3s remains, sleep for remainder minus 2s guard window
-        if (g_sleepMs > elapsedMs + 3000) {
-            nodeGoSleep(g_sleepMs - elapsedMs - 2000);
-        }
         return true;
     }
     return false;
