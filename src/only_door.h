@@ -22,7 +22,7 @@
 // -----------------------------------------------------------------------------
 // Pin definitions 
 // -----------------------------------------------------------------------------
-#define PIN_RELAY      15  // Αποφεύγουμε το 14 λόγω Keypad
+#define PIN_RELAY      15  //
 #define PIN_RFID_SS    5   
 #define PIN_RFID_RST   22  
 
@@ -73,6 +73,7 @@ void triggerUnlock() {
     digitalWrite(PIN_RELAY, HIGH);   // Άνοιγμα ρελέ
     vTaskDelay(pdMS_TO_TICKS(2000)); // Παραμένει ανοιχτό για 2 δευτερόλεπτα
     digitalWrite(PIN_RELAY, LOW);    // Κλείδωμα ξανά
+    digitalWrite(2, HIGH);
 }
 
 // -----------------------------------------------------------------------------
@@ -84,6 +85,13 @@ void nodeSetup() {
 
     SPI.begin();
     mfrc522.PCD_Init();
+    // Έλεγχος αν ο reader αποκρίνεται
+    Serial.print(F("[RFID] Reader connection check: "));
+    if (mfrc522.PCD_PerformSelfTest()) {
+        Serial.println(F("OK"));
+    } else {
+        Serial.println(F("FAILED or Not Found"));
+    }
     resetSystem();
 
     Serial.println("[LOCK] Hardware init OK (locked)");
@@ -159,6 +167,12 @@ void nodeHandleDownlink(uint8_t cmd, uint8_t* data, uint8_t dataLen) {
     // Ο συνολικός αριθμός των bytes (NodeID + cmd + data)
     uint8_t totalLen = dataLen + 2; 
 
+    Serial.print(F("\n[DEBUG-RAW] Received Packet (Hex): "));
+    for (int i = 0; i < totalLen; i++) {
+        Serial.printf("%02X ", packet[i]);
+    }
+    Serial.println();
+
     // --- ΑΠΟ ΕΔΩ ΚΑΙ ΚΑΤΩ ΕΙΝΑΙ Ο ΔΙΚΟΣ ΣΟΥ ΚΩΔΙΚΑΣ (Χωρίς καμία αλλαγή) ---
     if (totalLen < 11) {
         Serial.println("[SECURITY] Error: Downlink Packet too short");
@@ -192,6 +206,14 @@ void nodeHandleDownlink(uint8_t cmd, uint8_t* data, uint8_t dataLen) {
     uint16_t receivedSeq = (decryptedOutput[0] << 8) | decryptedOutput[1];
     uint16_t receivedCmd = (decryptedOutput[2] << 8) | decryptedOutput[3];
 
+    //After decryption
+    Serial.println(F("---------------------------------------"));
+    Serial.println(F("[DEBUG-SECURE] Decryption Successful!"));
+    Serial.printf("[DEBUG-SECURE] Decrypted Seq: %u\n", receivedSeq);
+    Serial.printf("[DEBUG-SECURE] Decrypted Cmd: 0x%04X\n", receivedCmd);
+    Serial.printf("[DEBUG-SECURE] Last Valid Seq was: %u\n", lastAcceptedSequence);
+    Serial.println(F("---------------------------------------"));
+
     if (receivedSeq <= lastAcceptedSequence) {
         Serial.println("[SECURITY] REPLAY ATTACK: Old sequence number received.");
         mbedtls_gcm_free(&gcm);
@@ -199,10 +221,17 @@ void nodeHandleDownlink(uint8_t cmd, uint8_t* data, uint8_t dataLen) {
     }
 
     lastAcceptedSequence = receivedSeq;
-    Serial.printf("[SECURITY] Valid Encrypted Command! Seq: %u, Cmd: 0x%04X\n", receivedSeq, receivedCmd);
+    
+    // Ξεκάθαρο μήνυμα επιτυχίας
+    Serial.println(F("\n[GATEWAY] >>> Verified Secure Command Received!"));
+    Serial.printf("[GATEWAY] Sequence: %u | Command: 0x%04X\n", receivedSeq, receivedCmd);
 
     if (receivedCmd == 0x00FF) { 
+        Serial.println(F("[ACTION] Remote Unlock Command Confirmed. Operating Latch..."));
+        
         triggerUnlock(); 
+    } else {
+        Serial.printf("[ACTION] Unknown Command (0x%04X). No action taken.\n", receivedCmd);
     }
 
     mbedtls_gcm_free(&gcm);

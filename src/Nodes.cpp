@@ -23,12 +23,12 @@
 // TDMA timing
 // ---------------------------------------------------------------------------
 #define BEACON_INTERVAL_MS  55000
-#define BEACON_WINDOW_MS    3000
+#define BEACON_WINDOW_MS    3500
 #define FIRST_LISTEN_MS     300000   // 5 min — always catches first beacon
 #define TX_WINDOW_MS        2000
 #define ACK_WINDOW_MS       2000
-#define NEW_BEACON_MS       59500   // wait before re-entering beacon search
-#define SENSOR_PERIOD_MS    30000    // how often the sensor task reads
+#define NEW_BEACON_MS       59600   // wait before re-entering beacon search
+#define SENSOR_PERIOD_MS    30    // how often the sensor task reads
 #define COMMOM_SLOT_PERIOD  10000
 
 // ---------------------------------------------------------------------------
@@ -49,6 +49,8 @@
 //volatile uint32_t TRANS_SLOT_MS;
 
 HardwareSerial loraSerial(2);
+ bool shouldBeListening = false;
+
 
 TaskHandle_t Comms_TaskHandle  = NULL;
 TaskHandle_t Sensor_TaskHandle = NULL;
@@ -179,12 +181,13 @@ static void handleDownlinkHex(const String& hex) {
 
     uint8_t cmd     = (uint8_t)strtoul(hex.substring(2, 4).c_str(), nullptr, 16);
     uint8_t dataLen = (hex.length() - 4) / 2;
-    uint8_t data[8] = {};
-    for (uint8_t i = 0; i < dataLen && i < 8; i++) {
+    uint8_t data[16] = {};
+    for (uint8_t i = 0; i < dataLen && i < 16; i++) {
         data[i] = (uint8_t)strtoul(hex.substring(4 + i * 2, 6 + i * 2).c_str(), nullptr, 16);
     }
 
-    //nodeHandleDownlink(cmd, data, dataLen);
+
+    nodeHandleDownlink(cmd, data, dataLen);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,6 +229,7 @@ void Comms_TaskManager(void* pv) {
     TickType_t period;
 
     while (1) {
+        shouldBeListening = false;
         Serial.println("--- Waiting for beacon ---");
 
         bool beaconReceived = false;
@@ -249,6 +253,7 @@ void Comms_TaskManager(void* pv) {
         xTaskDelayUntil(&through_way_copy, pdMS_TO_TICKS(TRANS_SLOT_MS));
 
         // --- TX window ---
+        shouldBeListening = false; // Tell RX task to ignore any received packets (e.g. echoes) during our TX window
         Serial.printf("[NODE 0x%02X] TX window open\n", NODE_ID);
 
         uint8_t buf[16];
@@ -257,7 +262,7 @@ void Comms_TaskManager(void* pv) {
         len = g_payloadLen;
 
         //Serial.printf("[NODE %d] Payload ready (%d bytes)\n", NODE_ID, len);
-
+        loraCmd("radio rxstop");
         char sending[64];
         sprintf(sending , "radio tx %02X%02X%02X%02X%02X%02X%02X%02X", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
         //Serial.println(hex_to_string(buf, len));
@@ -286,7 +291,8 @@ void Comms_TaskManager(void* pv) {
                 str.trim();
 
                 if (str.indexOf("radio_rx") == 0) {
-                Serial.println("Success! ACK receives: " + str);
+                String ack = str.substring(9);
+                Serial.println("Success! ACK receives: " + ack);
                 } 
                 else if (str == "ok") {
                 Serial.println("Module is now listening...");
@@ -300,7 +306,7 @@ void Comms_TaskManager(void* pv) {
                 }
 
             }
-            vTaskDelay(5);
+            //vTaskDelay(5);
         }
 
         xTaskNotifyGive(Rx_TaskHandle);
@@ -313,48 +319,64 @@ void Comms_TaskManager(void* pv) {
 // Rx task — listens for downlinks and dispatches to node handler
 // ===========================================================================
  void Rx_TaskManager(void* pv) {
+    String lastReceived = "";
+   
     while (1) {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);  // Wait for notification from Comms task that RX window is open
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        shouldBeListening = true;
         Serial.println("\n--- RX window open ---");
         loraCmd("radio rxstop");
         loraCmd("radio rx 0");
-        while (1) {
 
+        while (1) {
+            // Έλεγχος για "διακοπή" από την Comms Task (reset window)
             if (ulTaskNotifyTake(pdTRUE, 0) == 1) {
-                Serial.println("Restarting RX window");
+                Serial.println("[RX] Restarting/Resetting window");
+                shouldBeListening = true;
                 loraCmd("radio rxstop");
-                loraCmd("radio rx 0");  
+                loraCmd("radio rx 0");
+                lastReceived = "";
+     
             }
 
-            if (loraSerial.available() > 0) {
-                Serial.println("waiting for any downlink");
+
+            if (loraSerial.available() > 0 && shouldBeListening) {
                 String resp = loraSerial.readStringUntil('\n');
+                Serial.println("Received: " + resp);
                 resp.trim();
 
-                if (resp.indexOf("radio_rx") == 0) {
-                    Serial.println("Shits in Rx Window: " + resp);
+                if (resp.startsWith("radio_rx")) {
+                    Serial.println("[RX] Data Detected: " + resp);
                     
+                    // Εύρεση του Hex payload (μετά το τελευταίο κενό)
+                    int spaceIdx = resp.lastIndexOf(' ');
+                    if (spaceIdx >= 0) {
+                        String hexPayload = resp.substring(spaceIdx + 1);
+                        if(hexPayload != lastReceived){
+                        
+                            lastReceived = hexPayload;
+                            handleDownlinkHex(hexPayload); // Καλεί τον parser που καλεί το .h
+                        }
+                    }
+                    //digitalWrite(2, LOW);
+                    loraCmd("radio rxstop");
+                    loraCmd("radio rx 0");  
                 }
-                else if (resp == "ok") {
-                    Serial.println("Module is now listening...");
-                } 
                 else if (resp == "radio_err") {
-                    Serial.println("Slot Timeout: No signal heard.");
+                    Serial.println("[RX] Timeout/Error - Restarting...");
                     loraCmd("radio rxstop");
                     loraCmd("radio rx 0"); 
                 }
-                else {
-                    // Catch-all for weird garbage
-                    Serial.println("Unexpected: " + resp);
-                }
+                vTaskDelay(pdMS_TO_TICKS(10));
             }
-            vTaskDelay(3);
+            
+           
         }
-        loraCmd("radio rxstop");
-         Serial.println("RX window closed");
+         vTaskDelay(pdMS_TO_TICKS(10));
         }
-        vTaskDelay(5);
+       
 }
+
 
 
 // ===========================================================================
@@ -364,9 +386,12 @@ void setup() {
     Serial.begin(115200);
     delay(500);
     Serial.printf("\n===== Node 0x%02X Starting =====\n", NODE_ID);
+    
 
     // Node-specific hardware init
-    //nodeSetup();
+    nodeSetup();
+    pinMode(2,OUTPUT);
+    digitalWrite(2, LOW);
 
     if (!loraInit()) {
         Serial.println("[ERROR] LoRa init failed — halting");
@@ -384,7 +409,7 @@ void setup() {
 
     xTaskCreatePinnedToCore(Comms_TaskManager,  "Comms",  10000, NULL, 2, &Comms_TaskHandle,  1);
     xTaskCreatePinnedToCore(Rx_TaskManager,     "Rx",   10000, NULL, 1, &Rx_TaskHandle,     1);
-    //xTaskCreatePinnedToCore(Sensor_TaskManager, "Sensor",  8000, NULL, 1, &Sensor_TaskHandle, 0);
+    xTaskCreatePinnedToCore(Sensor_TaskManager, "Sensor",  8000, NULL, 1, &Sensor_TaskHandle, 0);
 } 
 
 // ===========================================================================
