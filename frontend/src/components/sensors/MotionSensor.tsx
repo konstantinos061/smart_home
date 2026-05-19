@@ -19,19 +19,18 @@ export function MotionSensor({ sensorName, nodeName, sensorId, data, onDelete }:
     .filter(d => d.key === 'motionStatus')
     .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
 
-  const lightData = data
-    .filter(d => d.key === 'ledStatus')
+  const countData = data
+    .filter(d => d.key === 'counter')
     .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
 
   // Logic for UI
   const isMotionActive = motionData?.valueNumeric === 1;
-  const isLightOn = lightData?.valueNumeric === 1;
   const lastMotionTimestamp = motionData?.time 
     ? new Date(motionData.time).toLocaleString() 
     : 'No motion detected';
 
-  const batteryPct = motionData?.batteryPct ?? lightData?.batteryPct ?? null;
-  const rssi = motionData?.rssi ?? lightData?.rssi ?? null;
+  const batteryPct = motionData?.batteryPct ?? countData?.batteryPct ?? null;
+  const rssi = motionData?.rssi ?? motionData?.rssi ?? null;
   const nodeId = data[0]?.nodeId || '';
 
   const getRssiLevel = (rssi: number | null) => {
@@ -71,10 +70,8 @@ export function MotionSensor({ sensorName, nodeName, sensorId, data, onDelete }:
 
           <div className="info-list">
             <div className="info-item">
-              <span className="label">Light Status</span>
-              <span className={`status-badge ${isLightOn ? 'light-on' : 'light-off'}`}>
-                {isLightOn ? '💡 ON' : '🌑 OFF'}
-              </span>
+              <span className="label">Counter</span>
+              <span className="value-small">{countData}</span>
             </div>
 
             <div className="info-item">

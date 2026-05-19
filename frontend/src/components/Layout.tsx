@@ -11,7 +11,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="layout">
-      <nav className="sidebar">
+      {/* <nav className="sidebar">
         <div className="sidebar-header">
           <h2>Smart Home</h2>
         </div>
@@ -25,7 +25,7 @@ export function Layout({ children }: LayoutProps) {
             </Link>
           </li>
         </ul>
-      </nav>
+      </nav> */}
       <main className="main-content">
         <div className="content">
           {children}

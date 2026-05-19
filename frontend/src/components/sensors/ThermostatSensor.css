@@ -1,19 +1,20 @@
 .thermostat-sensor-card {
-  background: linear-gradient(135deg, #0a43ac 0%, #1d0443 100%);
-  border-radius: 12px;
+  background: #d5ecdb;
+  border-radius: 16px;
   padding: 24px;
-  color: white;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.12);
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 400px;
   transition: transform 0.2s, box-shadow 0.2s;
+  border: 1px solid #a9d8bb;
 }
 
 .thermostat-sensor-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.14);
 }
 
 .thermostat-sensor-header {
@@ -31,88 +32,91 @@
 }
 
 .delete-button {
-  background: rgba(255, 82, 82, 0.8);
+  background: #e5e7eb;
   border: none;
-  border-radius: 4px;
-  padding: 4px 8px;
+  border-radius: 8px;
+  padding: 6px 12px;
   cursor: pointer;
-  font-size: 16px;
-  color: white;
+  font-size: 15px;
+  color: #111827;
   font-weight: bold;
   transition: all 0.2s;
 }
 
 .delete-button:hover {
-  background: rgba(255, 30, 30, 1);
-  transform: scale(1.1);
+  background: #d1d5db;
+  transform: scale(1.05);
 }
 
 .history-button {
-  background: rgba(255, 255, 255, 0.2);
+  background: #f3f4f6;
   border: none;
-  border-radius: 4px;
-  padding: 4px 8px;
+  border-radius: 8px;
+  padding: 6px 12px;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 15px;
+  color: #111827;
   transition: background 0.2s;
 }
 
 .history-button:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: #e5e7eb;
 }
 
 .thermostat-sensor-header h3 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 800;
   flex: 1;
 }
 
 .temperature-display {
   display: flex;
   justify-content: center;
-  margin-bottom: 24px;
+  margin-bottom: 26px;
 }
 
 .temp-circle {
-  width: 140px;
-  height: 140px;
+  width: 150px;
+  height: 150px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
-  border: 4px solid rgba(255, 255, 255, 0.3);
+  background: #ffffff;
+  border: 4px solid #b8d9c5;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
   position: relative;
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: inset 0 2px 12px rgba(15, 23, 42, 0.06);
   transition: all 0.3s ease;
 }
 
 .temp-circle.heating {
-  border-color: #ff6b6b;
-  box-shadow: 0 0 24px rgba(255, 107, 107, 0.4), inset 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: #fb7185;
+  box-shadow: 0 0 28px rgba(251, 113, 133, 0.28), inset 0 2px 12px rgba(15, 23, 42, 0.06);
 }
 
 .temp-circle.cooling {
-  border-color: #4dabf7;
-  box-shadow: 0 0 24px rgba(77, 171, 247, 0.4), inset 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: #38bdf8;
+  box-shadow: 0 0 28px rgba(56, 189, 248, 0.24), inset 0 2px 12px rgba(15, 23, 42, 0.06);
 }
 
 .temp-circle.stable {
-  border-color: #51cf66;
-  box-shadow: 0 0 24px rgba(81, 207, 102, 0.4), inset 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: #34d399;
+  box-shadow: 0 0 28px rgba(52, 211, 153, 0.28), inset 0 2px 12px rgba(15, 23, 42, 0.06);
 }
 
 .temp-circle .temp-value {
-  font-size: 36px;
+  font-size: 38px;
   font-weight: 700;
+  color: #0f172a;
 }
 
 .temp-circle .temp-unit {
   font-size: 16px;
-  opacity: 0.8;
+  opacity: 1;
+  color: #111827;
 }
 
 .thermostat-controls {
@@ -123,8 +127,8 @@
 }
 
 .control-row {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  background: #f3f4f6;
+  border-radius: 12px;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -132,10 +136,11 @@
 }
 
 .control-row label {
-  font-size: 12px;
-  opacity: 0.9;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
+  color: #111827;
 }
 
 .temp-control {
@@ -148,10 +153,10 @@
 .temp-control button {
   width: 44px;
   height: 44px;
-  border-radius: 8px;
+  border-radius: 12px;
   border: none;
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
+  background: #d1fae5;
+  color: #0f172a;
   font-size: 20px;
   cursor: pointer;
   font-weight: 600;
@@ -159,7 +164,7 @@
 }
 
 .temp-control button:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: #a7f3d0;
   transform: scale(1.05);
 }
 
@@ -185,18 +190,20 @@
   font-weight: 700;
   flex: 1;
   text-align: center;
+  color: #111827;
 }
 
 .command-message {
   font-size: 12px;
-  opacity: 0.9;
+  opacity: 1;
+  color: #111827;
 }
 
 .humidity-row,
 .status-row,
 .timestamp-row {
-  background: rgba(255, 255, 255, 0.116);
-  border-radius: 8px;
+  background: #f3f4f6;
+  border-radius: 12px;
   padding: 12px 16px;
   display: flex;
   justify-content: space-between;
@@ -207,18 +214,19 @@
 .humidity-row .label,
 .status-row .label,
 .timestamp-row .label {
-  font-size: 12px;
-  opacity: 0.9;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: aliceblue;
+  color: #111827;
 }
 
 .humidity-row .value,
 .status-row .value,
 .timestamp-row .value {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
+  color: #0f172a;
 }
 
 .status-badge {
@@ -226,17 +234,26 @@
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.168);
+  background: #d1d5db;
+  color: #0f172a;
 }
 
 .status-badge.heating {
-  background: rgba(240, 70, 70, 0.694);
-  color: #f7c3c3;
+  background: #fecaca;
+  color: #991b1b;
 }
 
 .status-badge.idle {
-  background: rgba(81, 207, 102, 0.3);
-  color: #c6ffd0;
+  background: #d1fae5;
+  color: #166534;
+}
+
+.node-badge {
+  background: #e5e7eb;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: #111827;
 }
 
 .sensor-indicators {
@@ -252,50 +269,4 @@
   flex-direction: column;
   align-items: center;
   gap: 8px;
-}
-
-.battery-indicator .label,
-.rssi-indicator .label {
-  font-size: 12px;
-  opacity: 0.9;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: aliceblue;
-}
-
-.battery-bar {
-  width: 60px;
-  height: 12px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.battery-fill {
-  height: 100%;
-  border-radius: 6px;
-  transition: width 0.3s;
-}
-
-.battery-indicator .value {
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.antenna {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 20px;
-}
-
-.antenna-bar {
-  width: 4px;
-  border-radius: 2px;
-  transition: background-color 0.3s;
-}
-
-.rssi-indicator .value {
-  font-size: 12px;
-  font-weight: 600;
 }

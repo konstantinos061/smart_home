@@ -194,6 +194,7 @@ export function Dashboard() {
       </div>
 
       {/* Sensors by Type */}
+      <div className='sensor-types'>
       {Array.from(summary.sensorsByType.entries()).map(([sensorType, sensorsMap]) => (
         <div key={sensorType} className="sensor-type-section">
           <h2 className="section-title">
@@ -292,6 +293,7 @@ export function Dashboard() {
           )}
         </div>
       ))}
+      </div>
 
       {/* Empty State */}
       {summary.sensorsByType.size === 0 && (
@@ -304,7 +306,7 @@ export function Dashboard() {
 
       {/* Floating Add Button */}
       <button className="fab-button" onClick={() => setShowAddModal(true)} title="Add new sensor">
-        ➕
+        +      
       </button>
 
       {/* Modals */}

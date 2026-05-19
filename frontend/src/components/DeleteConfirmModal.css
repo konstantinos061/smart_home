@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(239, 246, 255, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -12,14 +12,14 @@
 }
 
 .confirm-modal {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.12);
   width: 90%;
-  max-width: 400px;
-  padding: 32px 24px;
+  max-width: 420px;
+  padding: 34px 26px;
   text-align: center;
-  animation: slideUp 0.3s ease-out;
+  animation: slideUp 0.24s ease-out;
 }
 
 @keyframes slideUp {
@@ -34,26 +34,27 @@
 }
 
 .confirm-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
+  font-size: 54px;
+  margin-bottom: 18px;
+  color: var(--danger);
 }
 
 .confirm-modal h2 {
-  margin: 0 0 12px 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #333;
+  margin: 0 0 14px 0;
+  font-size: 24px;
+  font-weight: 800;
+  color: #111827;
 }
 
 .confirm-message {
-  margin: 0 0 24px 0;
-  font-size: 14px;
-  color: #666;
-  line-height: 1.5;
+  margin: 0 0 26px 0;
+  font-size: 15px;
+  color: #111827;
+  line-height: 1.75;
 }
 
 .confirm-message strong {
-  color: #333;
+  color: #111827;
 }
 
 .modal-actions {
@@ -64,38 +65,38 @@
 
 .btn-cancel,
 .btn-danger {
-  padding: 10px 20px;
+  padding: 12px 20px;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-cancel {
-  background: #f0f0f0;
-  color: #333;
+  background: #f1f5f9;
+  color: #111827;
   flex: 1;
 }
 
 .btn-cancel:hover:not(:disabled) {
-  background: #e0e0e0;
+  background: #e2e8f0;
 }
 
 .btn-danger {
-  background: #ff5252;
+  background: #ef4444;
   color: white;
   flex: 1;
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #ff1744;
-  box-shadow: 0 2px 8px rgba(255, 82, 82, 0.3);
+  background: #dc2626;
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.28);
 }
 
 .btn-cancel:disabled,
 .btn-danger:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
 }

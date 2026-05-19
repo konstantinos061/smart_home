@@ -1,69 +1,95 @@
 .motion-sensor-card {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  border-radius: 12px;
+  background: #f8d5d5;
+  border-radius: 16px;
   padding: 24px;
-  color: white;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  color: #0f172a;
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.12);
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 400px;
   transition: all 0.3s ease;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid #e6b0b7;
 }
 
 .motion-sensor-card.active-alert {
-  box-shadow: 0 0 20px rgba(77, 171, 247, 0.2);
-  border: 1px solid rgba(77, 171, 247, 0.4);
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.18);
+  border: 1px solid #fca5a5;
 }
 
 .motion-sensor-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
+}
+
+.motion-sensor-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  flex: 1;
+}
+
+.delete-button,
+.history-button {
+  background: #f3f4f6;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 15px;
+  color: #111827;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.delete-button:hover,
+.history-button:hover {
+  background: #e5e7eb;
 }
 
 .status-display {
   display: flex;
   justify-content: center;
-  margin: 20px 0;
+  margin: 22px 0;
 }
 
 .status-orb {
-  width: 130px;
-  height: 130px;
+  width: 150px;
+  height: 150px;
   border-radius: 50%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 4px solid rgba(255, 255, 255, 0.2);
+  background: #ffffff;
+  border: 4px solid #f4b4b8;
   transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .status-orb.detected {
-  background: rgba(77, 171, 247, 0.2);
-  border-color: #4dabf7;
+  background: #fee2e2;
+  border-color: #ef4444;
   transform: scale(1.05);
-  box-shadow: 0 0 30px rgba(77, 171, 247, 0.4);
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.20);
 }
 
 .status-orb.still {
-  border-color: rgba(255, 255, 255, 0.2);
-  opacity: 0.8;
+  border-color: #f5c2c7;
+  opacity: 0.95;
 }
 
 .status-icon {
-  font-size: 40px;
-  margin-bottom: 4px;
+  font-size: 48px;
+  margin-bottom: 6px;
+  color: #b91c1c;
 }
 
 .status-text {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
+  color: #111827;
 }
 
 .info-list {
@@ -74,9 +100,9 @@
 }
 
 .info-item {
-  background: rgba(255, 255, 255, 0.07);
-  padding: 12px 16px;
-  border-radius: 8px;
+  background: #f3f4f6;
+  padding: 14px 18px;
+  border-radius: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -85,38 +111,37 @@
 .info-item .label {
   font-size: 11px;
   text-transform: uppercase;
-  color: #a0a0c0;
+  color: #111827;
 }
 
 .value-small {
   font-size: 12px;
-  color: #fff;
+  color: #0f172a;
 }
 
 .status-badge {
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
 }
 
 .status-badge.light-on {
-  background: #ffd43b;
-  color: #453000;
+  background: #fecaca;
+  color: #991b1b;
 }
 
 .status-badge.light-off {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: #d1d5db;
+  color: #111827;
 }
 
-/* Indicators from original style, slightly refined */
 .sensor-indicators {
   display: flex;
   justify-content: space-between;
   margin-top: 24px;
   padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid #d1d5db;
 }
 
 .indicator-group {
@@ -129,7 +154,7 @@
 .battery-container {
   width: 50px;
   height: 8px;
-  background: rgba(255, 255, 255, 0.1);
+  background: #e5e7eb;
   border-radius: 4px;
   overflow: hidden;
 }
@@ -143,11 +168,13 @@
 .antenna-bar {
   width: 4px;
   border-radius: 2px;
+  background: #9ca3af;
 }
 
 .node-badge {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 2px 8px;
-  border-radius: 4px;
+  background: #e5e7eb;
+  padding: 4px 10px;
+  border-radius: 999px;
   font-size: 11px;
+  color: #111827;
 }
