@@ -50,10 +50,10 @@ uint8_t newJoiningNodeID = 64;
 bool new_joinee = false;
 
 Node network[] = {
-    {"THERMO", 1, 0, 2,3},    
-    {"LIGHT", 2, 32,2,3},   
-    {"DOOR", 3,0,3,3},
-    {"NEW_DEVICE", 4,64,1,3}    
+    {"THERMO", 1, 32, 1,3},    
+    {"LIGHT", 2, 96,2,3},   
+    {"DOOR", 3,64,3,3}
+   
 };
 
 
@@ -109,7 +109,7 @@ void Send_ACK(TickType_t Starting_time_window, byte Device_Type){
       }
       loraTDMA.println(AckPlusData); //ACK
     }
-    else loraTDMA.println("radio tx 41434B"); //ACK
+    else loraTDMA.println("radio tx 41434BFFFFFFFF"); //ACK
 
     str = loraTDMA.readStringUntil('\n');
     str = loraTDMA.readStringUntil('\n');
@@ -196,11 +196,11 @@ void TDMA_TaskManager(void * pvParameters){
                   
                   xSemaphoreGive(payloadMutex);
               }
-              /*
+              
               if (LoraWANTaskHandle != NULL) {
                 xTaskNotifyGive(LoraWANTaskHandle);
               }
-                */
+              
 
               break;
             } 
@@ -248,7 +248,7 @@ void TDMA_TaskManager(void * pvParameters){
   }
 }
 
-/*
+
 void Downlink_TaskManager(void * pvParameters){
  
   while(1){
@@ -377,7 +377,7 @@ void LoraWAN_TaskManager(void * pvParameters){
   
 }
 
-*/
+
 void initialize_LoraWAN_Radio()
 {
   //reset RN2xx3
@@ -432,9 +432,9 @@ void setup() {
 
   payloadMutex = xSemaphoreCreateMutex();
 
-  //loraWAN.begin(57600, SERIAL_8N1, 18, 19);
+  loraWAN.begin(57600, SERIAL_8N1, 18, 19);
 
-  //initialize_LoraWAN_Radio();
+  initialize_LoraWAN_Radio();
 
   digitalWrite(RST, LOW);
   delay(200);
@@ -525,7 +525,7 @@ void setup() {
     1                  
   );
   
-  /*
+  
   //Create the task!
   xTaskCreatePinnedToCore(
     Downlink_TaskManager,         // Task function
@@ -549,7 +549,7 @@ void setup() {
     &LoraWANTaskHandle,  // Task handle
     0                
   );
-  */
+  
   
 }
 
