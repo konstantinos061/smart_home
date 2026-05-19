@@ -111,9 +111,9 @@ def _decode_motion(
     if len(raw_payload) != SENSOR_RECORD_SIZE:
         raise ValueError('Motion payload must be 8 bytes: header + motion + battery.')
 
-    motionStatus = _read_single_scaled(raw_payload[1:2])
-    ledStatus = _read_single_scaled(raw_payload[2:3])
-    battery_pct = _read_battery_pct(raw_payload[3])
+    motionStatus = _read_single_scaled(raw_payload[2:3])
+    counts = _read_single_scaled(raw_payload[3:4])
+    battery_pct = _read_battery_pct(raw_payload[4])
 
     return [
         MeasurementPayload(
@@ -129,9 +129,9 @@ def _decode_motion(
         MeasurementPayload(
             sensorId=sensor_id,
             sensorType='motion',
-            key='ledStatus',
+            key='counts',
             unit='state',
-            value=ledStatus,
+            value=counts,
             batteryPct=battery_pct,
             rssi=rssi,
             snr=snr,
