@@ -224,7 +224,7 @@
 .humidity-row .value,
 .status-row .value,
 .timestamp-row .value {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 400;
   color: #0f172a;
 }

@@ -115,8 +115,14 @@
 }
 
 .value-small {
-  font-size: 12px;
+  font-size: 15px;
   color: #0f172a;
+}
+
+.value-counts {
+  font-size: 20px;
+  color: #0f172a;
+  font-weight: 600;
 }
 
 .status-badge {
