@@ -20,7 +20,7 @@ export function MotionSensor({ sensorName, nodeName, sensorId, data, onDelete }:
     .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
 
   const countData = data
-    .filter(d => d.key === 'counter')
+    .filter(d => d.key === 'counts')
     .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
 
   // Logic for UI
@@ -71,7 +71,7 @@ export function MotionSensor({ sensorName, nodeName, sensorId, data, onDelete }:
           <div className="info-list">
             <div className="info-item">
               <span className="label">Counter</span>
-              <span className="value-small">{countData}</span>
+              <span className="value-counts">{countData?.valueNumeric ?? 0}</span>
             </div>
 
             <div className="info-item">
