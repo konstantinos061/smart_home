@@ -206,15 +206,7 @@ void Sensor_TaskManager(void* pv) {
     }
 }
 
-String hex_to_string(const uint8_t* buf, uint8_t len) {
-    String hex;
-    for (uint8_t i = 0; i < len; i++) {
-        char h[3];
-        sprintf(h, "%02X", buf[i]);
-        hex += h;
-    }
-    return hex;
-}
+
 
 // ---------------------------------------------------------------------------
 // Comms task — TDMA: beacon → wait for slot → TX → listen ACK → repeat
@@ -261,7 +253,7 @@ void Comms_TaskManager(void* pv) {
         loraCmd("radio rxstop");
         char sending[64];
         sprintf(sending , "radio tx %02X%02X%02X%02X%02X%02X%02X%02X", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
-        //Serial.println(hex_to_string(buf, len));
+        
 
         Serial.println("\n--- My Sending window ---");
         period = xTaskGetTickCount();
