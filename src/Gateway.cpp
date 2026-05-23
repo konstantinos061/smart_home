@@ -49,6 +49,8 @@ uint8_t current_min_freeSlot = 4;
 uint8_t newJoiningNodeID = 64;
 bool new_joinee = false;
 
+bool new_data = false;
+
 Node network[] = {
     {"THERMO", 1, 32, 1,3},    
     {"LIGHT", 2, 96,2,3},   
@@ -100,16 +102,17 @@ void Send_ACK(TickType_t Starting_time_window, byte Device_Type){
   while(xTaskGetTickCount() < (Starting_time_window + pdMS_TO_TICKS(ACK_WINDOW))){
 
     //If device is thremostat send data with ack
-    if(Device_Type == 1){
-      String AckPlusData = "radio tx 41434BAAAAAA";
+    if(Device_Type == 1 && new_data){
+      String AckPlusData = "radio tx 41434B";
       for (int i = 0; i < DownlinkPayloadLength; i++) {
         char hexBuffer[3];
         sprintf(hexBuffer, "%02X", DownlinkPayload[i]);
         AckPlusData += hexBuffer;
       }
       loraTDMA.println(AckPlusData); //ACK
+      new_data = false;
     }
-    else loraTDMA.println("radio tx 41434BFFFFFFFF"); //ACK
+    else loraTDMA.println("radio tx 41434B"); //ACK
 
     str = loraTDMA.readStringUntil('\n');
     str = loraTDMA.readStringUntil('\n');
@@ -223,7 +226,7 @@ void TDMA_TaskManager(void * pvParameters){
         xTaskDelayUntil(&period, pdMS_TO_TICKS(READING_WINDOW));
     
      
-        vTaskDelay(500);
+        vTaskDelay(100);
 
         period = xTaskGetTickCount();
         if(received_data){Send_ACK(period, network[i].Device_Type); 
@@ -259,7 +262,7 @@ void Downlink_TaskManager(void * pvParameters){
       loraTDMA.println("radio rxstop");
       loraTDMA.readStringUntil('\n');
 
-      String command = "radio tx 00";
+      String command = "radio tx ";
 
       for (int i = 0; i < DownlinkPayloadLength; i++) {
         char hexBuffer[3];
@@ -270,7 +273,7 @@ void Downlink_TaskManager(void * pvParameters){
 
       Serial.println("COmmand to send via Lora: " + command);
     
-      for(int tries = 0; tries < 40; tries++){
+      for(int tries = 0; tries < 5; tries++){
         
         loraTDMA.println(command);
 
@@ -278,7 +281,7 @@ void Downlink_TaskManager(void * pvParameters){
         loraTDMA.readStringUntil('\n');
       
 
-        vTaskDelay(50);
+        vTaskDelay(10);
       }
         
 
@@ -308,6 +311,7 @@ void LoraWAN_TaskManager(void * pvParameters){
 
 
     if(loraWAN.available() > 0){
+
       String incoming = loraWAN.readStringUntil('\n');
       incoming.trim();
       Serial.println("Data from LoraWAN " + incoming);
@@ -320,9 +324,12 @@ void LoraWAN_TaskManager(void * pvParameters){
 
       byte DeviceT = (actual_ID >> 5) & 0x07;
 
-      Serial.print("Node ID of LoraWANMsg: ");
-      Serial.println(actual_ID);
+      
 
+      Serial.print("Node ID of LoraWANMsg: ");
+      Serial.println(DeviceT);
+
+      /*
       bool new_node = true;
 
       //Loop to check if the node is new
@@ -332,7 +339,8 @@ void LoraWAN_TaskManager(void * pvParameters){
       if(new_node) Add_New_Node(actual_ID);
 
       //check if the message if for thermostat or door different behavior 
-  
+      */
+
       int hexStringLen = strlen(a);
 
       DownlinkPayloadLength = 0;
@@ -342,17 +350,18 @@ void LoraWAN_TaskManager(void * pvParameters){
 
           if (DownlinkPayloadLength >= MAX_PAYLOAD_SIZE) break;
       }
-      if(DeviceT == 3){
+      new_data = true;
+      if(DeviceT != 1){
       
         if (DownLinkTaskHandle != NULL) {
           xTaskNotifyGive(DownLinkTaskHandle);
         }
       }
+      
         
       
     }
       
-
     if(ulTaskNotifyTake(pdTRUE,0) > 0){
       Serial.println("TDMA Task signaled me! Time to send Uplink.");
 
@@ -524,6 +533,7 @@ void setup() {
     &TDMATaskHandle,  // Task handle
     1                  
   );
+
   
   
   //Create the task!
