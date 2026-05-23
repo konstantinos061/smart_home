@@ -4,7 +4,7 @@
 // TDMA timing
 // ---------------------------------------------------------------------------
 #define BEACON_INTERVAL_MS  55000
-#define BEACON_WINDOW_MS    3000
+#define BEACON_WINDOW_MS    3500
 #define FIRST_LISTEN_MS     300000
 #define TX_WINDOW_MS        2000
 #define ACK_WINDOW_MS       2000
