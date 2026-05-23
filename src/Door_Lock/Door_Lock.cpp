@@ -9,15 +9,14 @@
 //   -D NODE_ID=0xXX       (protocol address sent in every packet)
 //   -D TRANS_SLOT_MS=NNNN (ms after beacon when this node may transmit)
 // ---------------------------------------------------------------------------
-#if defined(NODE_THERMOSTAT)
-  #include "thermostat.h"
-#elif defined(NODE_LIGHT)
-  #include "light_node.h"
-#elif defined(NODE_LOCK)
-  #include "only_door.h"
-#else
-  #error "No node type defined. Add -D NODE_THERMOSTAT, NODE_LIGHT, or NODE_LOCK to build_flags."
-#endif
+
+
+//Code initally made for the communication of all nodes but we ended up just making a version for each different sensor
+
+//Authors: Afonso and Filippo
+
+
+#include "Door_Lock.h"
 
 // ---------------------------------------------------------------------------
 // TDMA timing
@@ -29,7 +28,7 @@
 #define ACK_WINDOW_MS       2000
 #define NEW_BEACON_MS       59600   // wait before re-entering beacon search
 #define SENSOR_PERIOD_MS    30    // how often the sensor task reads
-#define COMMOM_SLOT_PERIOD  10000
+
 
 // ---------------------------------------------------------------------------
 // LoRa UART
@@ -46,7 +45,6 @@
 #define LORA_PWR   "14"
 #define LORA_SYNC  "12"
 
-//volatile uint32_t TRANS_SLOT_MS;
 
 HardwareSerial loraSerial(2);
  bool shouldBeListening = false;
@@ -60,6 +58,7 @@ TaskHandle_t Rx_TaskHandle     = NULL;
 static uint8_t           g_payload[16];
 static uint8_t           g_payloadLen = 0;
 static SemaphoreHandle_t g_payloadMutex = NULL;
+
 
 // ---------------------------------------------------------------------------
 // LoRa helpers
@@ -129,6 +128,7 @@ static bool listenForBeacon(uint32_t windowMs) {
                     
                     String payload = resp.substring(spaceIdx + 1);
 
+                    /* Code for the for the dynamic joining
                     //Check if not empty and so if that is the case means new slot to be attributed!
                     if(payload.length() > 22){
                         const char* trans_slot = payload.c_str() + 22;
@@ -145,7 +145,7 @@ static bool listenForBeacon(uint32_t windowMs) {
                             //TRANS_SLOT_MS = tSlot * COMMOM_SLOT_PERIOD; 
                         }
                     }
-
+                    */
 
                     loraCmd("radio rxstop");
                     vTaskDelay(pdMS_TO_TICKS(50));
@@ -306,7 +306,7 @@ void Comms_TaskManager(void* pv) {
                 }
 
             }
-            //vTaskDelay(5);
+            
         }
 
         xTaskNotifyGive(Rx_TaskHandle);
@@ -329,7 +329,7 @@ void Comms_TaskManager(void* pv) {
         loraCmd("radio rx 0");
 
         while (1) {
-            // Έλεγχος για "διακοπή" από την Comms Task (reset window)
+            
             if (ulTaskNotifyTake(pdTRUE, 0) == 1) {
                 Serial.println("[RX] Restarting/Resetting window");
                 shouldBeListening = true;
@@ -355,7 +355,7 @@ void Comms_TaskManager(void* pv) {
                         if(hexPayload != lastReceived){
                         
                             lastReceived = hexPayload;
-                            handleDownlinkHex(hexPayload); // Καλεί τον parser που καλεί το .h
+                            handleDownlinkHex(hexPayload); 
                         }
                     }
                     //digitalWrite(2, LOW);

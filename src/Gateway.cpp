@@ -10,7 +10,7 @@
 #define BEACON_TIME 1000
 #define RST 21
 
-#define DOWNLINK_RETRIES  3
+#define DOWNLINK_RETRIES  5
 
 #define MAX_PAYLOAD_SIZE 64
 
@@ -21,8 +21,6 @@ uint8_t DownlinkPayload[MAX_PAYLOAD_SIZE];
 uint8_t payloadLength = 0;
 
 uint8_t DownlinkPayloadLength = 0;
-
-
 
 
 SemaphoreHandle_t payloadMutex;
@@ -76,6 +74,9 @@ void Add_New_Node(uint8_t NodeID){
   newJoiningNodeID = NodeID;
 
 }
+
+
+//Dynamic Node deletion - future work implementation!
 /*
 void Delete_Offline_Node(uint8_t NodeID){
 
@@ -236,11 +237,8 @@ void TDMA_TaskManager(void * pvParameters){
         else network[i].n_connections_failures--;
 
 
-        //Do the logic to update the fronend?
+        //Dynamic deletion - once again due to lack of time was not tested!
         //if(network[i].n_connections_failures == 0) Delete_Offline_Node(network[i].ID);
-
-
-        //Discuss with colleagues the removal of a device then
         
     }
     loraTDMA.println("radio rxstop");
@@ -273,7 +271,7 @@ void Downlink_TaskManager(void * pvParameters){
 
       Serial.println("COmmand to send via Lora: " + command);
     
-      for(int tries = 0; tries < 5; tries++){
+      for(int tries = 0; tries < DOWNLINK_RETRIES; tries++){
         
         loraTDMA.println(command);
 
@@ -329,6 +327,8 @@ void LoraWAN_TaskManager(void * pvParameters){
       Serial.print("Node ID of LoraWANMsg: ");
       Serial.println(DeviceT);
 
+      
+      //Logic for the dynamic addition of new nodes -- not tested due to the lack of time
       /*
       bool new_node = true;
 
@@ -338,7 +338,6 @@ void LoraWAN_TaskManager(void * pvParameters){
       }
       if(new_node) Add_New_Node(actual_ID);
 
-      //check if the message if for thermostat or door different behavior 
       */
 
       int hexStringLen = strlen(a);
@@ -351,6 +350,8 @@ void LoraWAN_TaskManager(void * pvParameters){
           if (DownlinkPayloadLength >= MAX_PAYLOAD_SIZE) break;
       }
       new_data = true;
+
+      //Only signal the donwlink task to send the payload in between TDMA slots if the downlink is not intended for the thermostate
       if(DeviceT != 1){
       
         if (DownLinkTaskHandle != NULL) {
@@ -422,7 +423,7 @@ void initialize_LoraWAN_Radio()
 
   while(!join_result)
   {
-    Serial.println("Unable to join. Are your keys correct, and do you have TTN coverage?");
+    Serial.println("Unable to join. Are your keys correct, and do you have Gateway coverage?");
     delay(10000); //delay a minute before retry
     join_result = myLoraWAN.initOTAA("0000000000000000", "50e181018fd18b956a549e647699b288");
   }
@@ -454,7 +455,7 @@ void setup() {
 
   Serial.println("Initing LoRa");
 
-  //used to read naything on the line garbage
+  //Used to read anything that the rn module for the lora communication might pick up when its being initialized 
   str = loraTDMA.readStringUntil('\n');
   Serial.println(str);
 

@@ -2,6 +2,7 @@
  * lock_node.h — Smart Lock Node
  * Sensors: RFID reader (SPI), keypad (GPIO)
  * Actuator: relay for door latch
+ * Author: Stavros
  */
 
 #pragma once
@@ -11,9 +12,7 @@
 #include <Keypad.h>
 #include "mbedtls/gcm.h"
 
-// -----------------------------------------------------------------------------
-// OVERRIDE ΓΙΑ ΝΑ ΔΟΥΛΕΥΕΙ ΤΟ KEYPAD ΧΩΡΙΣ ΝΑ ΠΕΙΡΑΞΟΥΜΕ ΤΟ Nodes.cpp
-// -----------------------------------------------------------------------------
+
 #ifdef SENSOR_PERIOD_MS
   #undef SENSOR_PERIOD_MS
   #define SENSOR_PERIOD_MS 30 
@@ -68,11 +67,11 @@ void resetSystem() {
 
 void triggerUnlock() {
     Serial.println("\n[DOOR] >>> UNLOCKING DOOR...");
-    success_openings++; // Σωρευτική αύξηση
+    success_openings++; 
     
-    digitalWrite(PIN_RELAY, HIGH);   // Άνοιγμα ρελέ
-    vTaskDelay(pdMS_TO_TICKS(2000)); // Παραμένει ανοιχτό για 2 δευτερόλεπτα
-    digitalWrite(PIN_RELAY, LOW);    // Κλείδωμα ξανά
+    digitalWrite(PIN_RELAY, HIGH);   
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    digitalWrite(PIN_RELAY, LOW);    
     digitalWrite(2, HIGH);
 }
 
@@ -85,7 +84,7 @@ void nodeSetup() {
 
     SPI.begin();
     mfrc522.PCD_Init();
-    // Έλεγχος αν ο reader αποκρίνεται
+    
     Serial.print(F("[RFID] Reader connection check: "));
     if (mfrc522.PCD_PerformSelfTest()) {
         Serial.println(F("OK"));
@@ -97,10 +96,9 @@ void nodeSetup() {
     Serial.println("[LOCK] Hardware init OK (locked)");
 }
 
-// Χτίζει το Uplink Payload (3 Bytes + 5 Bytes Padding) και ελέγχει τους σένσορες
 void nodeBuildPayload(uint8_t nodeId, uint8_t* buf, uint8_t* len) {
     
-    // --- 1. ΕΚΤΕΛΕΣΗ ΛΟΓΙΚΗΣ ΠΟΡΤΑΣ (POLLING) ---
+   
     if (currentState == SYS_WAITING_FOR_PIN && (millis() - lastKeyTime > KEYPAD_TIMEOUT)) {
         Serial.println("[SECURITY] PIN Timeout."); resetSystem();
     }
@@ -140,12 +138,12 @@ void nodeBuildPayload(uint8_t nodeId, uint8_t* buf, uint8_t* len) {
         }
     }
 
-    // --- 2. ΔΗΜΙΟΥΡΓΙΑ PAYLOAD (Συμβατό με την sprintf του Nodes.cpp) ---
+    
     buf[0] = nodeId;
     buf[1] = success_openings;
     buf[2] = unsuccessful_attempts;
     
-    // Padding με μηδενικά για να μην στείλει σκουπίδια το Nodes.cpp
+    
     buf[3] = 0x00; 
     buf[4] = 0x00; 
     buf[5] = 0x00; 
@@ -155,16 +153,16 @@ void nodeBuildPayload(uint8_t nodeId, uint8_t* buf, uint8_t* len) {
     *len = 8; 
 }
 
-// Προσαρμοσμένη υπογραφή για να ταιριάζει με την κλήση του Nodes.cpp
+
 void nodeHandleDownlink(uint8_t cmd, uint8_t* data, uint8_t dataLen) {
     
-    // Ανακατασκευή του "packet" για να δουλέψει ο δικός σου κώδικας από κάτω ανέπαφος
+    
     uint8_t packet[16] = {0};
     packet[0] = NODE_ID; 
     packet[1] = cmd;
     memcpy(&packet[2], data, dataLen);
 
-    // Ο συνολικός αριθμός των bytes (NodeID + cmd + data)
+    
     uint8_t totalLen = dataLen + 2; 
 
     Serial.print(F("\n[DEBUG-RAW] Received Packet (Hex): "));
@@ -173,7 +171,7 @@ void nodeHandleDownlink(uint8_t cmd, uint8_t* data, uint8_t dataLen) {
     }
     Serial.println();
 
-    // --- ΑΠΟ ΕΔΩ ΚΑΙ ΚΑΤΩ ΕΙΝΑΙ Ο ΔΙΚΟΣ ΣΟΥ ΚΩΔΙΚΑΣ (Χωρίς καμία αλλαγή) ---
+    
     if (totalLen < 11) {
         Serial.println("[SECURITY] Error: Downlink Packet too short");
         return;
@@ -222,7 +220,7 @@ void nodeHandleDownlink(uint8_t cmd, uint8_t* data, uint8_t dataLen) {
 
     lastAcceptedSequence = receivedSeq;
     
-    // Ξεκάθαρο μήνυμα επιτυχίας
+    
     Serial.println(F("\n[GATEWAY] >>> Verified Secure Command Received!"));
     Serial.printf("[GATEWAY] Sequence: %u | Command: 0x%04X\n", receivedSeq, receivedCmd);
 

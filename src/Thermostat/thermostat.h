@@ -2,7 +2,7 @@
  * =============================================================================
  * thermostat.h — Thermostat Node Sensors & Payload
  * =============================================================================
- * Responsible: Filippo, Gabriel
+ * Responsible: Filippo, Afonso
  *
  * Exposes three functions called by the main protocol firmware:
  *   nodeSetup()            — initialise all thermostat hardware
