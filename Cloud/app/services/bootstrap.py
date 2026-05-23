@@ -1,7 +1,7 @@
 from sqlalchemy import text
 
-from Cloud.app.db import engine
-from Cloud.app.models import Base
+from ..db import engine
+from ..models import Base
 
 
 def init_db() -> None:

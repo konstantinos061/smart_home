@@ -86,7 +86,7 @@ docker compose up --build
 | Dashboard | http://localhost |
 | API Documentation | http://localhost:8000/docs |
 | Database Admin (Adminer) | http://localhost:8081 |
-| Node-RED | http://localhost:1880 |
+| Node-RED | http://10.0.0.1:1880 |
 | ChirpStack | http://10.0.0.1:8080 |
 
 ### Add Test Data
@@ -131,9 +131,9 @@ curl -X POST http://localhost:8000/api/v1/uplink \
 
 ### Backend Setup
 ```bash
-cd app
-pip install -r ../requirements.txt
-uvicorn main:app --reload
+cd Cloud
+python3 -m pip install -r requirements.txt
+uvicorn app.main:app --reload
 ```
 
 ### Frontend Setup

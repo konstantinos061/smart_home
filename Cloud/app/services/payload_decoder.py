@@ -2,8 +2,8 @@ import base64
 import binascii
 from typing import Optional
 
-from Cloud.app.schemas import MeasurementPayload, UplinkPayload
-from Cloud.app.services.sensor_type_from_id import _sensor_type_from_sensor_id
+from ..schemas import MeasurementPayload, UplinkPayload
+from .sensor_type_from_id import _sensor_type_from_sensor_id
 
 
 THERMOSTAT_SCALE = 10.0
@@ -222,4 +222,3 @@ def _get_rxInfo_field(payload: UplinkPayload, field: str) -> Optional[int]:
         return int(value) if value is not None else None
     except (TypeError, ValueError):
         return None
-

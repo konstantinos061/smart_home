@@ -1,6 +1,7 @@
 import base64
 from typing import Any
-from Cloud.app.services.encrypt_lora_packet import encrypt_lora_packet, SECRET_KEY
+
+from .encrypt_lora_packet import SECRET_KEY, encrypt_lora_packet
 
 DOWNLINK_FPORT = 1
 SET_TEMPERATURE_COMMAND = 0x01

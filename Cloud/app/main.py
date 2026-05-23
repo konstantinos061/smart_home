@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from Cloud.app.api.routes import router
-from Cloud.app.services.bootstrap import init_db
+from .api.routes import router
+from .services.bootstrap import init_db
 
 app = FastAPI(title='Smart Home IoT Platform Starter')
 
