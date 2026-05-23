@@ -2,8 +2,8 @@ import base64
 import binascii
 from typing import Optional
 
-from app.schemas import MeasurementPayload, UplinkPayload
-from app.services.sensor_type_from_id import _sensor_type_from_sensor_id
+from Cloud.app.schemas import MeasurementPayload, UplinkPayload
+from Cloud.app.services.sensor_type_from_id import _sensor_type_from_sensor_id
 
 
 THERMOSTAT_SCALE = 10.0

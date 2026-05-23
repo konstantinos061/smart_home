@@ -1,4 +1,4 @@
-from app.db import SessionLocal
+from Cloud.app.db import SessionLocal
 
 
 def get_db():
