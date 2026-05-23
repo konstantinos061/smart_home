@@ -17,23 +17,13 @@ static int64_t rtcMicros() {
 }
 
 // ---------------------------------------------------------------------------
-// Node type selection set exactly one of these in build_flags:
-//   -D NODE_THERMOSTAT
-//   -D NODE_LIGHT
-//   -D NODE_LOCK
-// Also required in build_flags:
+// Data required in build_flags:
 //   -D NODE_ID=0xXX       (protocol address sent in every packet)
 //   -D TRANS_SLOT_MS=NNNN (ms after beacon when this node may transmit)
 // ---------------------------------------------------------------------------
-#if defined(NODE_THERMOSTAT)
-  #include "thermostat.h"
-#elif defined(NODE_LIGHT)
-  #include "light_node.h"
-#elif defined(NODE_LOCK)
-  #include "lock_node.h"
-#else
-  #error "No node type defined. Add -D NODE_THERMOSTAT, NODE_LIGHT, or NODE_LOCK to build_flags."
-#endif
+
+#include "Smart_Light.h"
+
 
 // ---------------------------------------------------------------------------
 // TDMA timing
@@ -70,7 +60,7 @@ RTC_DATA_ATTR static uint32_t g_transSlotMs = TRANS_SLOT_MS;
 
 HardwareSerial loraSerial(2);
 
-#ifdef NODE_LIGHT
+
 // Deep sleep model everything runs linearly in setup().
 RTC_DATA_ATTR static int64_t g_nextBeaconUs   = 0;
 RTC_DATA_ATTR static int64_t g_lastBeaconUs   = 0;   // last successful beacon detection 
@@ -88,16 +78,7 @@ RTC_DATA_ATTR static bool    g_pirArmed       = false;
 // Motion level at sleep entry ext0 was armed for the OPPOSITE level, so on
 // PIR wake the new state is !g_motionAtSleep 
 RTC_DATA_ATTR static bool    g_motionAtSleep  = false;
-#else
-TaskHandle_t Comms_TaskHandle  = NULL;
-TaskHandle_t Sensor_TaskHandle = NULL;
-TaskHandle_t Rx_TaskHandle     = NULL;
 
-// Shared payload: Sensor task writes, Comms task reads
-static uint8_t           g_payload[16];
-static uint8_t           g_payloadLen = 0;
-static SemaphoreHandle_t g_payloadMutex = NULL;
-#endif
 
 // ---------------------------------------------------------------------------
 // LoRa helpers
@@ -197,6 +178,7 @@ static bool listenForBeacon(uint32_t windowMs) {
                     // SYNC_BEACON = "53594E435F424541434F4E" (11 bytes = 22 hex chars).
                     // If the gateway appended a new joinee slot assignment, the
                     // bytes after offset 22 are [NODE_ID][slot] in hex.
+                    /*
                     if (payload.length() >= 26) {
                         const char* assign = payload.c_str() + 22;
                         char idHex[3]   = { assign[0], assign[1], '\0' };
@@ -210,6 +192,7 @@ static bool listenForBeacon(uint32_t windowMs) {
                                           slot, g_transSlotMs);
                         }
                     }
+                    */
 
                     loraCmd("radio rxstop");
                     vTaskDelay(pdMS_TO_TICKS(50));
@@ -259,202 +242,7 @@ static void sendPacket(const uint8_t* buf, uint8_t len) {
     loraSerial.setTimeout(2000);
 }
 
-#ifndef NODE_LIGHT
-// ---------------------------------------------------------------------------
-// Parse and dispatch a downlink hex payload from the gateway.
-// Expected format: [dest 1B] [cmd 1B] [data 0..N B]
-// ---------------------------------------------------------------------------
-static void handleDownlinkHex(const String& hex) {
-    if (hex.length() < 4) return;
 
-    uint8_t destId = (uint8_t)strtoul(hex.substring(0, 2).c_str(), nullptr, 16);
-    if (destId != NODE_ID) return;
-
-    uint8_t cmd     = (uint8_t)strtoul(hex.substring(2, 4).c_str(), nullptr, 16);
-    uint8_t dataLen = (hex.length() - 4) / 2;
-    uint8_t data[8] = {};
-    for (uint8_t i = 0; i < dataLen && i < 8; i++) {
-        data[i] = (uint8_t)strtoul(hex.substring(4 + i * 2, 6 + i * 2).c_str(), nullptr, 16);
-    }
-
-    //nodeHandleDownlink(cmd, data, dataLen);
-}
-
-// ---------------------------------------------------------------------------
-// Sensor task reads sensors every SENSOR_PERIOD_MS and updates shared buf
-// ---------------------------------------------------------------------------
-void Sensor_TaskManager(void* pv) {
-    while (1) {
-        uint8_t buf[16];
-        uint8_t len = 0;
-        nodeBuildPayload(NODE_ID, buf, &len);
-
-        if (len > 0) {
-            xSemaphoreTake(g_payloadMutex, portMAX_DELAY);
-            memcpy(g_payload, buf, len);
-            g_payloadLen = len;
-            xSemaphoreGive(g_payloadMutex);
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(SENSOR_PERIOD_MS));
-    }
-}
-#endif
-
-String hex_to_string(const uint8_t* buf, uint8_t len) {
-    String hex;
-    for (uint8_t i = 0; i < len; i++) {
-        char h[3];
-        sprintf(h, "%02X", buf[i]);
-        hex += h;
-    }
-    return hex;
-}
-
-#ifndef NODE_LIGHT
-// ---------------------------------------------------------------------------
-// Comms task TDMA: beacon → wait for slot → TX → listen ACK → repeat
-// This is for other nodes, the LIGHT node uses a deep sleep flow instead
-// ---------------------------------------------------------------------------
-void Comms_TaskManager(void* pv) {
-    static bool firstListen = true;
-    TickType_t through_way_copy;
-    TickType_t period;
-
-    while (1) {
-        Serial.println("--- Waiting for beacon ---");
-
-        bool beaconReceived = false;
-        while (!beaconReceived) {
-            uint32_t listenWindow = firstListen ? FIRST_LISTEN_MS : BEACON_WINDOW_MS;
-            beaconReceived = listenForBeacon(listenWindow);
-            firstListen = false;
-
-            if (!beaconReceived) {
-                Serial.println("[BEACON] Retrying in 60 s...");
-                vTaskDelay(pdMS_TO_TICKS(BEACON_INTERVAL_MS));
-                if (!loraInit()) Serial.println("[ERROR] LoRa re-init failed");
-            }
-        }
-
-        // Record beacon tick, then delay until our assigned slot
-        xTaskNotifyGive(Rx_TaskHandle);  // Tell RX task to start listening for downlink in this beacon interval
-        TickType_t start_time = xTaskGetTickCount();
-        through_way_copy = start_time;
-        xTaskDelayUntil(&through_way_copy, pdMS_TO_TICKS(TRANS_SLOT_MS));
-
-        // --- TX window ---
-        Serial.printf("[NODE 0x%02X] TX window open\n", NODE_ID);
-
-        uint8_t buf[16];
-        uint8_t len = 0;
-        nodeBuildPayload(NODE_ID, buf, &len);
-
-        Serial.println("\n--- Handling windows ---");
-
-        for (int i = 0; i < len; i++) {
-            Serial.printf("%02X ", buf[i]);
-        }
-
-        char sending[64];
-        sprintf(sending , "radio tx %02X%02X%02X%02X%02X%02X%02X%02X", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
-        //Serial.println(hex_to_string(buf, len));
-
-        Serial.println("\n--- My Sending window ---");
-        period = xTaskGetTickCount();
-        while(xTaskGetTickCount() < (period + pdMS_TO_TICKS(TX_WINDOW_MS))) {
-            
-            loraSerial.println(sending);
-            loraSerial.readStringUntil('\n');
-            loraSerial.readStringUntil('\n');
-
-            vTaskDelay(10);
-        }
-
-        loraCmd("radio rx 0");
-
-        //Read ACK
-        Serial.println("\n--- Listening for ACK ---");
-        period = xTaskGetTickCount();
-        while(xTaskGetTickCount() < (period + pdMS_TO_TICKS(ACK_WINDOW_MS))) {
-
-            
-            if(loraSerial.available() > 0){
-                String str = loraSerial.readStringUntil('\n');
-                Serial.println("str from lora: " + str);
-                str.trim();
-
-                if (str.indexOf("radio_rx") == 0) {
-                Serial.println("Success! ACK receives: " + str);
-                } 
-                else if (str == "ok") {
-                Serial.println("Module is now listening...");
-                } 
-                else if (str == "radio_err") {
-                Serial.println("Slot Timeout: No signal heard.");
-                }
-                else {
-                // Catch-all for weird garbage
-                Serial.println("Unexpected: " + str);
-                }
-
-            }
-            vTaskDelay(5);
-        }
-
-        xTaskNotifyGive(Rx_TaskHandle);
-        through_way_copy = start_time;
-        xTaskDelayUntil(&through_way_copy, pdMS_TO_TICKS(NEW_BEACON_MS));
-    }
-}
-#endif  // !NODE_LIGHT
-#ifndef NODE_LIGHT
-// ===========================================================================
-// Rx task listens for downlinks and dispatches to node handler
-// ===========================================================================
- void Rx_TaskManager(void* pv) {
-    while (1) {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);  // Wait for notification from Comms task that RX window is open
-        Serial.println("\n--- RX window open ---");
-        loraCmd("radio rxstop");
-        loraCmd("radio rx 0");
-        while (1) {
-
-            if (ulTaskNotifyTake(pdTRUE, 0) == 1) {
-                Serial.println("Restarting RX window");
-                loraCmd("radio rxstop");
-                loraCmd("radio rx 0");
-            }
-
-            if (loraSerial.available() > 0) {
-                String resp = loraSerial.readStringUntil('\n');
-                resp.trim();
-
-                if (resp.indexOf("radio_rx") == 0) {
-                    Serial.println("Downlink in Rx Window: " + resp);
-                }
-                else if (resp == "ok") {
-                    Serial.println("Module is now listening...");
-                }
-                else if (resp == "radio_err") {
-                    Serial.println("Slot Timeout: No signal heard.");
-                    loraCmd("radio rxstop");
-                    loraCmd("radio rx 0");
-                }
-                else {
-                    Serial.println("Unexpected: " + resp);
-                }
-            }
-            vTaskDelay(3);
-        }
-        loraCmd("radio rxstop");
-        Serial.println("RX window closed");
-    }
-}
-#endif
-
-
-#ifdef NODE_LIGHT
 // ===========================================================================
 // RN2483 sleep helpers
 // ---------------------------------------------------------------------------
@@ -538,7 +326,7 @@ static void deepSleepUntilNextBeacon() {
     esp_deep_sleep_start();
     while (true) {}  // unreachable
 }
-#endif  // NODE_LIGHT
+
 
 // ===========================================================================
 // SETUP
@@ -552,162 +340,138 @@ void setup() {
     btStop();
     setCpuFrequencyMhz(80);
 
-#ifdef NODE_LIGHT
-    // -------------------------------------------------------------------
-    // LIGHT node deep sleep state machine.
-    //   POR / undefined wake => first-listen window, full LoRa init.
-    //   Timer wake           => short-listen window, radio stays configured.
-    //   ext0 (PIR) wake      => service motion, sleep again until next beacon.
-    // -------------------------------------------------------------------
-    esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
-    Serial.printf("\n===== Node 0x%02X (cause=%d) =====\n", NODE_ID, (int)cause);
 
-    nodeSetup();  // pinModes, ADC, releases LED hold from previous sleep
-    rtc_gpio_hold_dis((gpio_num_t)LORA_RST);  // release RST hold from previous sleep
+// -------------------------------------------------------------------
+// LIGHT node deep sleep state machine.
+//   POR / undefined wake => first-listen window, full LoRa init.
+//   Timer wake           => short-listen window, radio stays configured.
+//   ext0 (PIR) wake      => service motion, sleep again until next beacon.
+// -------------------------------------------------------------------
+esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+Serial.printf("\n===== Node 0x%02X (cause=%d) =====\n", NODE_ID, (int)cause);
 
-    if (cause == ESP_SLEEP_WAKEUP_EXT0) {
-        Serial.println("[WAKE] PIR");
-        // ext0 was armed for the level opposite to g_motionAtSleep, so the
-        // new state is its negation. Avoids rereading a bouncing pin.
-        lightHandlePIRWake(!g_motionAtSleep);
-        deepSleepUntilNextBeacon();  // never returns
-    }
+nodeSetup();  // pinModes, ADC, releases LED hold from previous sleep
+rtc_gpio_hold_dis((gpio_num_t)LORA_RST);  // release RST hold from previous sleep
 
-    // POR or timer wake => run a beacon round.
-    bool firstBoot = !g_loraInitedOnce;
-    if (firstBoot) {
-        Serial.println("[WAKE] POR initialising LoRa");
-        if (!loraInit()) {
-            Serial.println("[ERROR] LoRa init failed sleeping 10 s and retrying");
-            g_nextBeaconUs = rtcMicros() + 10LL * 1000000LL;
-            deepSleepUntilNextBeacon();
-        }
-        g_loraInitedOnce = true;
-        g_radioSleeping = false;
-    } else {
-        Serial.println("[WAKE] Timer waking radio from sys sleep");
-        // UART driver was torn down by deep sleep; radioWake begins again
-        radioWake();
-        g_radioSleeping = false;
-        loraCmd("radio rxstop");  // drain any leftover output
-        // One full sleep cycle (~BEACON_INTERVAL_MS) has elapsed since POR
-        // the HCSR501 has had time to settle, so we can now wake on PIR edges without getting trapped in a wake loop.
-        g_pirArmed = true;
-    }
-
-    // Sync LED to current PIR and let the awake window ISR track edges.
-    digitalWrite(PIN_LED, digitalRead(PIN_MOTION) == HIGH ? HIGH : LOW);
-    attachInterrupt(digitalPinToInterrupt(PIN_MOTION), pirEdgeISR, CHANGE);
-
-    if (g_pendingTx) {
-        // ---------------------------------------------------------------
-        // TX phase  we deep sleep through the slot wait. The radio still
-        // holds the listen config which sys sleep preserves, so just TX.
-        // ---------------------------------------------------------------
-        Serial.println("[WAKE] TX phase");
-        g_pendingTx = false;
-
-        uint8_t buf[16];
-        uint8_t len = 0;
-        nodeBuildPayload(NODE_ID, buf, &len);
-
-        char sending[64];
-        sprintf(sending, "radio tx %02X%02X%02X%02X%02X%02X%02X%02X",
-                buf[0], buf[1], buf[2], buf[3],
-                buf[4], buf[5], buf[6], buf[7]);
-
-        Serial.println("--- TX window ---");
-        TickType_t period = xTaskGetTickCount();
-        while (xTaskGetTickCount() < period + pdMS_TO_TICKS(TX_WINDOW_MS)) {
-            loraSerial.println(sending);
-            loraSerial.readStringUntil('\n');
-            loraSerial.readStringUntil('\n');
-            delay(10);
-        }
-
-        loraCmd("radio rx 0");
-
-        Serial.println("--- ACK window ---");
-        period = xTaskGetTickCount();
-        while (xTaskGetTickCount() < period + pdMS_TO_TICKS(ACK_WINDOW_MS)) {
-            if (loraSerial.available() > 0) {
-                String s = loraSerial.readStringUntil('\n');
-                s.trim();
-                if (s.indexOf("radio_rx") == 0)      Serial.println("ACK: " + s);
-                else if (s == "radio_err")          Serial.println("Slot timeout");
-                else if (s.length() > 0)            Serial.println("RX: " + s);
-            }
-            delay(5);
-        }
-    } else {
-        // ---------------------------------------------------------------
-        // Listen phase: POR or scheduled timer wake for next beacon.
-        // ---------------------------------------------------------------
-        uint32_t window = firstBoot ? FIRST_LISTEN_MS : BEACON_WINDOW_MS;
-        bool got = listenForBeacon(window);
-        int64_t beacon_ref_us = rtcMicros();
-
-        if (got) {
-            g_lastBeaconUs = beacon_ref_us;  // anchor cadence to last real beacon
-            g_pendingTx = true;
-            // Schedule a deep sleep wake at the start of our TX slot. The
-            // gateway measures the slot from the beacon transmission, which
-            // is a few tens of ms before beacon_ref_us... so close enough.
-            g_nextBeaconUs = beacon_ref_us + (int64_t)g_transSlotMs * 1000LL;
-            Serial.printf("[NODE 0x%02X] beacon OK, sleeping %u ms until TX slot\n",
-                          NODE_ID, g_transSlotMs);
-        } else {
-            Serial.println("[BEACON] Missed: retrying at next frame");
-        }
-    }
-
-    detachInterrupt(digitalPinToInterrupt(PIN_MOTION));
-
-    // After TX phase or a missed listen, schedule the next BEACON listen by
-    // projecting from the last KNOWN beacon in FRAME_SIZE_MS steps and waking
-    // BEACON_WINDOW_MS/2 early to give the radio time to wake and settle before the beacon arrives. If
-    // A successful listen already set g_nextBeaconUs above; skip rescheduling.
-    if (!g_pendingTx) {
-        int64_t now_us         = rtcMicros();
-        int64_t period_us      = (int64_t)FRAME_SIZE_MS     * 1000LL;
-        int64_t half_window_us = (int64_t)BEACON_WINDOW_MS  * 1000LL / 2;
-
-        if (g_lastBeaconUs > 0) {
-            int64_t next = g_lastBeaconUs + period_us;
-            while (next - half_window_us < now_us) next += period_us;
-            g_nextBeaconUs = next - half_window_us;
-        } else {
-            // No beacon ever heard and we need to retry sooner than a full period.
-            g_nextBeaconUs = now_us + period_us / 2;
-        }
-    }
-
+if (cause == ESP_SLEEP_WAKEUP_EXT0) {
+    Serial.println("[WAKE] PIR");
+    // ext0 was armed for the level opposite to g_motionAtSleep, so the
+    // new state is its negation. Avoids rereading a bouncing pin.
+    lightHandlePIRWake(!g_motionAtSleep);
     deepSleepUntilNextBeacon();  // never returns
-#else
-    // -------------------------------------------------------------------
-    // Non-LIGHT nodes: task based forever loop.
-    // -------------------------------------------------------------------
-    delay(450);
-    Serial.printf("\n===== Node 0x%02X Starting =====\n", NODE_ID);
-    Serial.printf("[PWR] WiFi/BT off, CPU @ %u MHz\n", getCpuFrequencyMhz());
+}
 
-    nodeSetup();
-
+// POR or timer wake => run a beacon round.
+bool firstBoot = !g_loraInitedOnce;
+if (firstBoot) {
+    Serial.println("[WAKE] POR initialising LoRa");
     if (!loraInit()) {
-        Serial.println("[ERROR] LoRa init failed — halting");
-        while (true) delay(1000);
+        Serial.println("[ERROR] LoRa init failed sleeping 10 s and retrying");
+        g_nextBeaconUs = rtcMicros() + 10LL * 1000000LL;
+        deepSleepUntilNextBeacon();
     }
-    Serial.println("[LORA] Init OK");
+    g_loraInitedOnce = true;
+    g_radioSleeping = false;
+} else {
+    Serial.println("[WAKE] Timer waking radio from sys sleep");
+    // UART driver was torn down by deep sleep; radioWake begins again
+    radioWake();
+    g_radioSleeping = false;
+    loraCmd("radio rxstop");  // drain any leftover output
+    // One full sleep cycle (~BEACON_INTERVAL_MS) has elapsed since POR
+    // the HCSR501 has had time to settle, so we can now wake on PIR edges without getting trapped in a wake loop.
+    g_pirArmed = true;
+}
 
-    g_payloadMutex = xSemaphoreCreateMutex();
-    nodeBuildPayload(NODE_ID, g_payload, &g_payloadLen);
-    for (int i = 0; i < g_payloadLen; i++) {
-        Serial.printf("%02X ", g_payload[i]);
+// Sync LED to current PIR and let the awake window ISR track edges.
+digitalWrite(PIN_LED, digitalRead(PIN_MOTION) == HIGH ? HIGH : LOW);
+attachInterrupt(digitalPinToInterrupt(PIN_MOTION), pirEdgeISR, CHANGE);
+
+if (g_pendingTx) {
+    // ---------------------------------------------------------------
+    // TX phase  we deep sleep through the slot wait. The radio still
+    // holds the listen config which sys sleep preserves, so just TX.
+    // ---------------------------------------------------------------
+    Serial.println("[WAKE] TX phase");
+    g_pendingTx = false;
+
+    uint8_t buf[16];
+    uint8_t len = 0;
+    nodeBuildPayload(NODE_ID, buf, &len);
+
+    char sending[64];
+    sprintf(sending, "radio tx %02X%02X%02X%02X%02X%02X%02X%02X",
+            buf[0], buf[1], buf[2], buf[3],
+            buf[4], buf[5], buf[6], buf[7]);
+
+    Serial.println("--- TX window ---");
+    TickType_t period = xTaskGetTickCount();
+    while (xTaskGetTickCount() < period + pdMS_TO_TICKS(TX_WINDOW_MS)) {
+        loraSerial.println(sending);
+        loraSerial.readStringUntil('\n');
+        loraSerial.readStringUntil('\n');
+        delay(10);
     }
 
-    xTaskCreatePinnedToCore(Comms_TaskManager, "Comms", 10000, NULL, 2, &Comms_TaskHandle, 1);
-    xTaskCreatePinnedToCore(Rx_TaskManager,    "Rx",    10000, NULL, 1, &Rx_TaskHandle,    1);
-#endif
+    loraCmd("radio rx 0");
+
+    Serial.println("--- ACK window ---");
+    period = xTaskGetTickCount();
+    while (xTaskGetTickCount() < period + pdMS_TO_TICKS(ACK_WINDOW_MS)) {
+        if (loraSerial.available() > 0) {
+            String s = loraSerial.readStringUntil('\n');
+            s.trim();
+            if (s.indexOf("radio_rx") == 0)      Serial.println("ACK: " + s);
+            else if (s == "radio_err")          Serial.println("Slot timeout");
+            else if (s.length() > 0)            Serial.println("RX: " + s);
+        }
+        delay(5);
+    }
+} else {
+    // ---------------------------------------------------------------
+    // Listen phase: POR or scheduled timer wake for next beacon.
+    // ---------------------------------------------------------------
+    uint32_t window = firstBoot ? FIRST_LISTEN_MS : BEACON_WINDOW_MS;
+    bool got = listenForBeacon(window);
+    int64_t beacon_ref_us = rtcMicros();
+
+    if (got) {
+        g_lastBeaconUs = beacon_ref_us;  // anchor cadence to last real beacon
+        g_pendingTx = true;
+        // Schedule a deep sleep wake at the start of our TX slot. The
+        // gateway measures the slot from the beacon transmission, which
+        // is a few tens of ms before beacon_ref_us... so close enough.
+        g_nextBeaconUs = beacon_ref_us + (int64_t)g_transSlotMs * 1000LL;
+        Serial.printf("[NODE 0x%02X] beacon OK, sleeping %u ms until TX slot\n",
+                        NODE_ID, g_transSlotMs);
+    } else {
+        Serial.println("[BEACON] Missed: retrying at next frame");
+    }
+}
+
+detachInterrupt(digitalPinToInterrupt(PIN_MOTION));
+
+// After TX phase or a missed listen, schedule the next BEACON listen by
+// projecting from the last KNOWN beacon in FRAME_SIZE_MS steps and waking
+// BEACON_WINDOW_MS/2 early to give the radio time to wake and settle before the beacon arrives. If
+// A successful listen already set g_nextBeaconUs above; skip rescheduling.
+if (!g_pendingTx) {
+    int64_t now_us         = rtcMicros();
+    int64_t period_us      = (int64_t)FRAME_SIZE_MS     * 1000LL;
+    int64_t half_window_us = (int64_t)BEACON_WINDOW_MS  * 1000LL / 2;
+
+    if (g_lastBeaconUs > 0) {
+        int64_t next = g_lastBeaconUs + period_us;
+        while (next - half_window_us < now_us) next += period_us;
+        g_nextBeaconUs = next - half_window_us;
+    } else {
+        // No beacon ever heard and we need to retry sooner than a full period.
+        g_nextBeaconUs = now_us + period_us / 2;
+    }
+}
+
+deepSleepUntilNextBeacon();  // never returns
+
 }
 
 void loop() {}

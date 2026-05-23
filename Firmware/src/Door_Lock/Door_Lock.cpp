@@ -1,15 +1,10 @@
 #include <Arduino.h>
 
 // ---------------------------------------------------------------------------
-// Node-type selection — set exactly one of these in build_flags:
-//   -D NODE_THERMOSTAT
-//   -D NODE_LIGHT
-//   -D NODE_LOCK
-// Also required in build_flags:
+// Data required in build_flags:
 //   -D NODE_ID=0xXX       (protocol address sent in every packet)
 //   -D TRANS_SLOT_MS=NNNN (ms after beacon when this node may transmit)
 // ---------------------------------------------------------------------------
-
 
 //Code initally made for the communication of all nodes but we ended up just making a version for each different sensor
 
@@ -28,6 +23,7 @@
 #define ACK_WINDOW_MS       2000
 #define NEW_BEACON_MS       59600   // wait before re-entering beacon search
 #define SENSOR_PERIOD_MS    30    // how often the sensor task reads
+#define COMMOM_SLOT_PERIOD  10000
 
 
 // ---------------------------------------------------------------------------

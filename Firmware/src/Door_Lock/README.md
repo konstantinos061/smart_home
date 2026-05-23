@@ -99,9 +99,9 @@ Set the following in `platformio.ini`:
 ```ini
 build_flags =
     -D NODE_LOCK
-    -D NODE_ID=0x60
+    -D NODE_ID=0x40
     -D TRANS_SLOT_MS=20000
 ```
 
-- `NODE_ID`: unique identifier for this node (MSBs `011` = lock type)
-- `TRANS_SLOT_MS`: offset in ms from beacon at which this node transmits (e.g. `20000` = slot 2)
+- `NODE_ID`: unique identifier for this node (MSBs `010` = lock type)
+- `TRANS_SLOT_MS`: offset in ms from beacon at which this node transmits (e.g. `30000` = slot 3)
