@@ -1,6 +1,6 @@
 # 🔒 Smart Lock Node
 
-> Mains-powered ESP32 smart lock node for the DTU IoT Smart Home System developed by GROUP 1 of the 34346 Networking technologies and application development for Internet of Things (IoT) course Spring 2026.  
+> Mains-powered ESP32 smart lock node for the LoRa Based Smart Home System developed by GROUP 1 of the 34346 Networking technologies and application development for Internet of Things (IoT) course Spring 2026.  
 > Implements two-factor physical access control (RFID + PIN) and supports encrypted remote unlock commands via LoRa downlink.
 
 

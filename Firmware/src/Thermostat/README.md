@@ -1,6 +1,6 @@
 # 🌡️ Smart Thermostat Node
 
-> Battery-powered ESP32 thermostat node for the DTU IoT Smart Home System developed by GROUP 1 of the 34346 Networking technologies and application development for Internet of Things (IoT) course Spring 2026.  
+> Battery-powered ESP32 thermostat node for the LoRa Based Smart Home System developed by GROUP 1 of the 34346 Networking technologies and application development for Internet of Things (IoT) course Spring 2026.  
 > Measures temperature and humidity, supports local setpoint adjustment, and communicates via a custom LoRa TDMA protocol.
 
 

@@ -1,6 +1,6 @@
 # 🏠 Smart Home IoT System — Firmware
 
-> Firmware for the DTU IoT Smart Home System developed by GROUP 1 of the 34346 Networking technologies and application development for Internet of Things (IoT) course Spring 2026.
+> Firmware for the LoRa Based Smart Home System developed by GROUP 1 of the 34346 Networking technologies and application development for Internet of Things (IoT) course Spring 2026.
 >
 > The system comprises a mains-powered gateway and three end nodes: a smart thermostat, a smart light, and a smart lock, communicating over a custom LoRa TDMA protocol. The gateway bridges local LoRa traffic to a LoRaWAN network connected to a ChirpStack server hosted on Azure.
 

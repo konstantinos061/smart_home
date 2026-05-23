@@ -2,7 +2,7 @@
 
 > **Group 1** — 34346 Networking Technologies and Application Development for Internet of Things (IoT), Spring 2026, Technical University of Denmark (DTU).
 
-A complete end-to-end smart home system spanning embedded firmware, a custom wireless protocol, and a self-hosted cloud stack. Three ESP32 sensor nodes communicate with a central gateway over a custom LoRa TDMA protocol. The gateway bridges local traffic via LoraWAn to a network gateway connected to a ChirpStack server on Azure, where a FastAPI backend and React dashboard provide real-time monitoring and remote control.
+A complete end-to-end LoRa Based Smart Home System spanning embedded firmware, a custom wireless protocol, and a self-hosted cloud stack. Three ESP32 sensor nodes communicate with a central gateway over a custom LoRa TDMA protocol. The gateway bridges local traffic via LoraWAn to a network gateway connected to a ChirpStack server on Azure, where a FastAPI backend and React dashboard provide real-time monitoring and remote control.
 
 ## Authors
 

@@ -1,6 +1,6 @@
 # 💡 Smart Light Node
 
-> Battery-powered ESP32 smart light node for the DTU IoT Smart Home System developed by GROUP 1 of the 34346 Networking technologies and application development for Internet of Things (IoT) course Spring 2026.  
+> Battery-powered ESP32 smart light node for the LoRa Based Smart Home System developed by GROUP 1 of the 34346 Networking technologies and application development for Internet of Things (IoT) course Spring 2026.  
 > Detects motion via a PIR sensor, drives an LED indicator, and communicates battery and motion telemetry via a custom LoRa TDMA protocol.
 
 
