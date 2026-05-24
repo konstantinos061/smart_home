@@ -33,7 +33,6 @@
 #define LORA_RX    16
 #define LORA_RST   21
 #define LORA_FREQ  "868100000"
-#define LORA_FREQ_RX "868300000"
 #define LORA_SF    "sf7"
 #define LORA_BW    "125"
 #define LORA_CR    "4/5"

@@ -50,7 +50,6 @@ RTC_DATA_ATTR static uint32_t g_transSlotMs = TRANS_SLOT_MS;
 #define LORA_RX    19
 #define LORA_RST   15
 #define LORA_FREQ  "868100000"
-#define LORA_FREQ_RX "868300000"
 #define LORA_SF    "sf7"
 #define LORA_BW    "125"
 #define LORA_CR    "4/5"
