@@ -2,7 +2,7 @@
  * =============================================================================
  * thermostat.h — Thermostat Node Sensors & Payload
  * =============================================================================
- * Responsible: Filippo, Afonso
+ * Responsible: Filippo, Gabriel
  *
  * Exposes three functions called by the main protocol firmware:
  *   nodeSetup()            — initialise all thermostat hardware
@@ -18,23 +18,22 @@
 #include <Preferences.h>
 #include <DHT.h>
 #include <LiquidCrystal_I2C.h>
-
+#include <driver/rtc_io.h>
 // -----------------------------------------------------------------------------
 // Pin definitions
 // -----------------------------------------------------------------------------
 #define PIN_DHT           5
-#define PIN_ENC_CLK       34
-#define PIN_ENC_DT        35
-#define PIN_ENC_SW        32
+#define PIN_EXT0          32
 #define PIN_LCD_SDA       21
 #define PIN_LCD_SCL       22
 #define PIN_BATTERY_ADC   33
+#define PIN_POT_ADC       36 
 
 // -----------------------------------------------------------------------------
 // Configuration
 // -----------------------------------------------------------------------------
 #define DHT_STARTUP_MS  2500
-#define BEACON_FRAME_MS 59500  // must match NEW_BEACON_MS in Thermostat.cpp
+#define BEACON_FRAME_MS 59500 
 #define SETPOINT_MIN    15
 #define SETPOINT_MAX    30
 #define UI_TIMEOUT_MS   10000
@@ -57,13 +56,17 @@ static LiquidCrystal_I2C _lcd(0x27, 16, 2);
 static Preferences     _prefs;
 
 extern volatile bool g_uiActive;
+extern volatile bool g_sleepPending;
+extern SemaphoreHandle_t g_dhtMutex;
 
 // RTC memory — survives deep sleep
 extern RTC_DATA_ATTR float    thermoSetPoint;
 extern RTC_DATA_ATTR bool     thermoFirstBoot;
+extern RTC_DATA_ATTR bool     g_uiWasActive;
 
 RTC_DATA_ATTR float   thermoSetPoint  = 20.0f;
 RTC_DATA_ATTR bool    thermoFirstBoot = true;
+RTC_DATA_ATTR bool    g_uiWasActive   = false;
 
 // -----------------------------------------------------------------------------
 // Internal helpers
@@ -84,8 +87,10 @@ static int16_t encodeTemp10(float t) {
 
 static int _readBatteryPercent() {
 #ifdef NO_BATTERY
+    // For testing on mains power, return a fixed value instead of reading ADC
     return 100;
 #else
+    // Take multiple readings and average to reduce noise
     long sum = 0;
     for (int i = 0; i < 16; i++) { sum += analogRead(PIN_BATTERY_ADC); delay(2); }
     float adcV  = (sum / 16.0f) * (3.3f / 4095.0f);
@@ -104,16 +109,11 @@ static void _displaySetPointScreen(float temp, float setpt) {
     _lcd.printf("Set:  %.1f C", setpt);
 }
 
-static float _readEncoder() {
-    static int lastClk = HIGH;
-    int clk = digitalRead(PIN_ENC_CLK);
-    int dt  = digitalRead(PIN_ENC_DT);
-    float delta = 0.0f;
-    if (clk != lastClk && clk == LOW) {
-        delta = (dt != clk) ? -0.1f : +0.1f;
-    }
-    lastClk = clk;
-    return delta;
+static float readPotSetpoint() {
+    long sum = 0;
+    for (int i = 0; i < 8; i++) { sum += analogRead(PIN_POT_ADC); delay(1); }
+    float raw = sum / 8.0f;
+    return SETPOINT_MIN + (raw / 4095.0f) * (SETPOINT_MAX - SETPOINT_MIN);
 }
 
 // -----------------------------------------------------------------------------
@@ -149,20 +149,22 @@ void nodeRunUI() {
     _lcd.init();
     _lcd.backlight();
 
-    _dht.begin();
-    delay(DHT_STARTUP_MS);
-    float temp = _readTemperature();
+    float temp = 0.0f;
+    if (xSemaphoreTake(g_dhtMutex, pdMS_TO_TICKS(8000)) == pdTRUE) {
+        _dht.begin();
+        delay(DHT_STARTUP_MS);
+        temp = _readTemperature();
+        xSemaphoreGive(g_dhtMutex);
+    }
 
     _displaySetPointScreen(temp, thermoSetPoint);
 
-    pinMode(PIN_ENC_CLK, INPUT);
-    pinMode(PIN_ENC_DT,  INPUT);
-    pinMode(PIN_ENC_SW,  INPUT_PULLUP);
+    pinMode(PIN_EXT0,  INPUT_PULLUP);
 
     unsigned long lastActivity = millis();
 
     while (true) {
-        if (millis() - lastActivity >= UI_TIMEOUT_MS) {
+        if (g_sleepPending || millis() - lastActivity >= UI_TIMEOUT_MS) {
             _prefs.begin("thermo", false);
             _prefs.putFloat("setpt", thermoSetPoint);
             _prefs.end();
@@ -170,9 +172,10 @@ void nodeRunUI() {
             break;
         }
 
-        float delta = _readEncoder();
-        if (delta != 0.0f) {
-            thermoSetPoint = constrain(thermoSetPoint + delta, SETPOINT_MIN, SETPOINT_MAX);
+        float newSetpt = readPotSetpoint();
+        newSetpt = roundf(newSetpt * 10.0f) / 10.0f;
+        if (fabsf(newSetpt - thermoSetPoint) >= 0.1f) {
+            thermoSetPoint = constrain(newSetpt, SETPOINT_MIN, SETPOINT_MAX);
             _displaySetPointScreen(temp, thermoSetPoint);
             lastActivity = millis();
             Serial.printf("[THERMO] Setpoint -> %.1f°C\n", thermoSetPoint);
@@ -202,14 +205,17 @@ void nodeRunUI() {
  */
 void nodeBuildPayload(uint8_t nodeId, uint8_t* buf, uint8_t* len) {
 
-    _dht.begin();
-    delay(DHT_STARTUP_MS);
-    _dht.readTemperature();  // discard first read
-    _dht.readHumidity();
-    delay(2000);
-
-    float temp     = _readTemperature();
-    float humidity = _readHumidity();
+    float temp = 0.0f, humidity = 0.0f;
+    if (xSemaphoreTake(g_dhtMutex, pdMS_TO_TICKS(8000)) == pdTRUE) {
+        _dht.begin();
+        delay(DHT_STARTUP_MS);
+        _dht.readTemperature();  // discard first read
+        _dht.readHumidity();
+        delay(2000);
+        temp     = _readTemperature();
+        humidity = _readHumidity();
+        xSemaphoreGive(g_dhtMutex);
+    }
     int   battPct  = _readBatteryPercent();
 
     int16_t temp_enc = encodeTemp10(temp);
@@ -237,14 +243,21 @@ void nodeBuildPayload(uint8_t nodeId, uint8_t* buf, uint8_t* len) {
  */
 
 void nodeHandleDownlink(uint8_t cmd, uint8_t* data, uint8_t dataLen) {
-    if (cmd == CMD_SET_SETPOINT && dataLen >= 2) {
-        int intsetpoint = data[0];
-        int floatpoint = data[1];
-        float newSetPoint = intsetpoint + floatpoint / 100.0f;
+    Serial.print("Command received: ");
+    Serial.println(cmd);
+    
+    if (cmd == CMD_SET_SETPOINT && dataLen >= 4) {
+        // data contains ASCII hex: ['0', 'A', '7', '8']
+        // Convert to string and parse as hex
+        char hexStr[5] = {(char)data[0], (char)data[1], (char)data[2], (char)data[3], '\0'};
+        uint16_t rawValue = (uint16_t)strtol(hexStr, nullptr, 16);
+        float newSetPoint = rawValue / 100.0f;
+        
         thermoSetPoint = constrain(newSetPoint, SETPOINT_MIN, SETPOINT_MAX);
         _prefs.begin("thermo", false);
         _prefs.putFloat("setpt", thermoSetPoint);
         _prefs.end();
+        
         Serial.printf("[THERMO] Setpoint updated to %.1f°C via downlink\n", thermoSetPoint);
     }
 }
@@ -269,7 +282,7 @@ void nodeGoSleep(uint32_t sleepMs) {
     Serial.printf("[SLEEP] %u ms\n", sleepMs);
     Serial.flush();
     esp_sleep_enable_timer_wakeup((uint64_t)sleepMs * 1000ULL);
-    esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_ENC_SW, 0);  // press = LOW
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_EXT0, 0);  // press = LOW
     esp_deep_sleep_start();
 }
 

@@ -32,9 +32,11 @@ HardwareSerial loraSerial(2);
 static uint8_t   g_payload[16];
 static uint8_t   g_payloadLen = 0;
 static uint32_t  g_beaconMs   = 0;
-volatile bool    g_txActive   = false;
-volatile bool    g_uiActive   = false;
+volatile bool    g_txActive        = false;
+volatile bool    g_uiActive        = false;
+volatile bool    g_sleepPending    = false;
 static bool      g_startUIImmediately = false;
+SemaphoreHandle_t g_dhtMutex      = nullptr;
 
 // ---------------------------------------------------------------------------
 // LoRa helpers
@@ -79,6 +81,25 @@ static bool loraInit() {
     r = loraCmd("radio set sync " LORA_SYNC);   if (r != "ok") { Serial.println("[LORA] sync -> "      + r); return false; }
     r = loraCmd("radio set bw "   LORA_BW);     if (r != "ok") { Serial.println("[LORA] bw -> "        + r); return false; }
     return true;
+}
+
+static void radioSleep(uint32_t ms) {
+    if (ms < 100) ms = 100;
+    loraSerial.println("sys sleep " + String(ms));
+    delay(20);
+    while (loraSerial.available()) loraSerial.read();
+}
+
+static void radioWake() {
+    loraSerial.end();
+    pinMode(LORA_TX, OUTPUT);
+    digitalWrite(LORA_TX, LOW);  delay(5);
+    digitalWrite(LORA_TX, HIGH); delayMicroseconds(100);
+    loraSerial.begin(57600, SERIAL_8N1, LORA_RX, LORA_TX);
+    loraSerial.setTimeout(2000);
+    loraSerial.write(0x55);
+    delay(50);
+    while (loraSerial.available()) loraSerial.read();
 }
 
 static bool listenForBeacon(uint32_t windowMs) {
@@ -127,7 +148,7 @@ static bool listenForBeacon(uint32_t windowMs) {
 // Killed automatically when esp_deep_sleep_start() fires.
 // ---------------------------------------------------------------------------
 static void uiTask(void*) {
-     pinMode(PIN_ENC_SW, INPUT_PULLUP);
+     pinMode(PIN_EXT0, INPUT_PULLUP);
     
     // If woken by button, run UI immediately without waiting for a press
     if (g_startUIImmediately) {
@@ -136,7 +157,7 @@ static void uiTask(void*) {
     }
     
     while (true) {
-        if (digitalRead(PIN_ENC_SW) == LOW) {
+        if (digitalRead(PIN_EXT0) == LOW) {
             nodeRunUI();
             delay(200);
         }
@@ -176,7 +197,21 @@ static void tdmaTask(void*) {
             String s = loraSerial.readStringUntil('\n');
             s.trim();
             if (s.indexOf("radio_rx") == 0) {
+                s = s.substring(9);
                 Serial.println("[NODE] ACK: " + s);
+                if(s.length() > 6) {
+                    s = s.substring(7);
+                    char ID[3] = {s[0], s[1], '\0'};
+                    char cmd[3] = {s[2], s[3], '\0'};
+                    const char* dataStr = s.c_str() + 4;
+                    uint8_t node_id = (uint8_t)strtol(ID, nullptr, 16);
+ 
+                    if (node_id == 32) {
+                            nodeHandleDownlink((uint8_t)strtol(cmd, nullptr, 16), (uint8_t*)dataStr, s.length() - 4);
+                    }
+                    
+                }
+                
             }
         }
         
@@ -190,9 +225,12 @@ static void tdmaTask(void*) {
                        : NEW_BEACON_MS - 2500;
 
     Serial.printf("[NODE] elapsed=%u ms  sleep=%u ms\n", elapsed, sleepMs);
+    g_uiWasActive = g_uiActive;  // persist across deep sleep so next boot re-opens UI
+    g_sleepPending = true;       // signal UI task to shut down cleanly
     loraCmd("radio rxstop", 500);
-    loraSerial.println("sys sleep " + String(sleepMs + 3000));  // LoRa sleeps a bit longer
-    delay(100);
+    delay(300);  // give UI task time to save setpoint and turn off LCD
+    rtc_gpio_hold_en((gpio_num_t)LORA_RST);
+    radioSleep(sleepMs + 3000);
     nodeGoSleep(sleepMs);
 }
 
@@ -204,9 +242,18 @@ void setup() {
     delay(200);
     Serial.printf("\n===== Thermostat 0x%02X =====\n", NODE_ID);
 
-    g_startUIImmediately = nodeHandleWakeup();
+    bool buttonWakeup    = nodeHandleWakeup();
+    g_startUIImmediately = buttonWakeup || g_uiWasActive;
+    g_uiWasActive        = false;  // consumed — clear before next cycle
+
+    rtc_gpio_hold_dis((gpio_num_t)LORA_RST);
+    if (!buttonWakeup && g_tdmaSynced) {
+        radioWake();
+    }
 
     nodeSetup();
+
+    g_dhtMutex = xSemaphoreCreateMutex();
 
     // Start UI task now so button works throughout the entire active window
     xTaskCreatePinnedToCore(uiTask, "UI", 4096, NULL, 1, NULL,0);
@@ -218,17 +265,18 @@ void setup() {
     Serial.println("[LORA] Init OK");
 
     // Beacon window depends on wakeup cause:
-    //   Timer wakeup: short window (already synced) or full 5-min (first boot)
+    //   Timer wakeup (incl. UI resume): short window (already synced) or full 5-min (first boot)
     //   Button wakeup: calculate from remaining planned sleep, or force full resync if overrun
     uint32_t beaconWindow;
-    if (g_startUIImmediately) {
+    if (buttonWakeup) {
         uint64_t elapsedTicks = rtc_time_get() - g_sleepStartTick;
         uint32_t hz           = rtc_clk_slow_freq_get_hz();
         uint32_t elapsedMs    = (uint32_t)(elapsedTicks * 1000ULL / hz);
-        Serial.printf("[WAKEUP] slept+UI = %u ms of planned %u ms\n", elapsedMs, g_sleepMs);
+        Serial.printf("[WAKEUP] slept+button = %u ms of planned %u ms\n", elapsedMs, g_sleepMs);
         if (g_sleepMs > elapsedMs + 3000) {
-            // Within window: remaining sleep + margin to cover setup overhead
-            beaconWindow = g_sleepMs - elapsedMs + 5000;
+            // Beacon arrives at (g_sleepMs + 2500) from sleepStartTick.
+            // +2500 corrects for the early-wake offset; +5000 is the true margin.
+            beaconWindow = g_sleepMs - elapsedMs + 2500 + 5000;
         } else {
             // Overrun: lost sync, force 5-min hunt
             g_tdmaSynced = false;
