@@ -33,7 +33,7 @@ The system is organised into two tiers:
 
 | Device | Power | Function |
 |---|---|---|
-| 🌡️ Smart Thermostat | Battery | Measures temperature and humidity; local setpoint adjustment via rotary encoder and LCD; accepts remote setpoint downlinks |
+| 🌡️ Smart Thermostat | Battery | Measures temperature and humidity; local setpoint adjustment via potentiometer and LCD; accepts remote setpoint downlinks |
 | 💡 Smart Light | Battery + custom PCB | PIR-triggered LED; reports motion events and battery level; deep sleep with dual wake source (timer + PIR ext0) |
 | 🔒 Smart Lock | Mains | Two-factor access control (RFID + PIN); accepts AES-GCM encrypted remote unlock commands; continuous LoRa RX |
 | 📡 Gateway | Mains | Dual-radio ESP32 bridge; runs TDMA scheduler, LoRaWAN uplink/downlink, and FreeRTOS task architecture |
