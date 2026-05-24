@@ -77,7 +77,7 @@ The uplink payload buffer shared between the TDMA and LoRaWAN tasks is protected
 
 ### 🌡️ Smart Thermostat (`src/Thermostat/`)
 
-Battery-powered. Measures temperature and humidity (DHT11), displays readings and setpoint on a 16×2 I²C LCD, and supports local setpoint adjustment via a rotary encoder. Accepts remote setpoint commands piggybacked onto the gateway ACK frame.
+Battery-powered. Measures temperature and humidity (DHT11), displays readings and setpoint on a 16×2 I²C LCD, and supports local setpoint adjustment via a potentiometer. Accepts remote setpoint commands piggybacked onto the gateway ACK frame.
 
 Deep-sleep driven: wakes 2.5 s before the expected beacon, listens for up to 5 s, stays awake to build and transmit the payload at its assigned slot, then sleeps until the next beacon. A second EXT0 wakeup on the encoder button (GPIO32) allows local UI interaction at any time.
 
