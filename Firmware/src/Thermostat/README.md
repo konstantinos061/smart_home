@@ -13,7 +13,7 @@
 | RN2483A | LoRa radio module | UART2 (TX: GPIO17, RX: GPIO16, RST: GPIO25) |
 | DHT11 | Temperature & humidity sensor | GPIO5 |
 | LCD 16x2 (I²C) | Local display (address 0x27) | I²C (SDA: GPIO21, SCL: GPIO22) |
-| Rotary Encoder | Setpoint adjustment | CLK: GPIO34, DT: GPIO35, SW: GPIO32 |
+| MDSP10KN-ESAI-2-19PY | Potentiometer with push switch for setpoint adjustment and wakeup | ADC1 CH0 (GPIO36), SW: EXT0 (GPIO32) |
 | LiPo Battery | Power supply | ADC1 CH5 (GPIO33) via voltage divider |
 
 
@@ -58,7 +58,7 @@ The setpoint is constrained to **15–30°C** and saved to NVS so it survives po
 The node uses ESP32 deep sleep between TDMA cycles to minimise battery drain:
 
 - **Timer wakeup** (`esp_sleep_enable_timer_wakeup`) — wakes the node just before the next beacon window
-- **EXT0 wakeup** (`esp_sleep_enable_ext0_wakeup`) — wakes on encoder button press to allow local setpoint adjustment at any time
+- **EXT0 wakeup** (`esp_sleep_enable_ext0_wakeup`) — wakes on potentiometer button press to allow local setpoint adjustment at any time
 - **RN2483A** is placed in `sys sleep` for the same duration as the ESP32
 - Sync state (`g_tdmaSynced`) and sleep timing (`g_sleepStartTick`, `g_sleepMs`) are stored in **RTC memory** to survive deep sleep
 - Setpoint is stored in **NVS** on first boot and cached in RTC memory for subsequent wakeups, avoiding costly flash reads every cycle
@@ -66,7 +66,7 @@ The node uses ESP32 deep sleep between TDMA cycles to minimise battery drain:
 
 ## Local UI
 
-When the encoder button is pressed (either as a wakeup cause or during the active window), the LCD backlight turns on and the user can adjust the setpoint using the rotary encoder. After **10 seconds of inactivity**, the new setpoint is saved to NVS and the UI closes.
+When the potentiometer button is pressed (either as a wakeup cause or during the active window), the LCD backlight turns on and the user can adjust the setpoint by turning the potentiometer. After **10 seconds of inactivity**, the new setpoint is saved to NVS and the UI closes.
 
 
 ## Build Flags
