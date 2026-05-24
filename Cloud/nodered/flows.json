@@ -1,0 +1,139 @@
+[
+    {
+        "id": "7f6c3d67a0c8f001",
+        "type": "tab",
+        "label": "ChirpStack Uplink",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "735a7d5bcb94a002",
+        "type": "function",
+        "z": "7f6c3d67a0c8f001",
+        "name": "Build ChirpStack-style payload",
+        "func": "msg.payload = {\n    nodeId: msg.payload.deviceInfo.devEui,\n    timestamp: new Date().toISOString(),\n    data: msg.payload.data,\n    rxInfo: [{ \n        rssi: msg.payload.rxInfo[0].rssi, \n        snr: msg.payload.rxInfo[0].snr \n    }]\n};\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 470,
+        "y": 200,
+        "wires": [
+            [
+                "d0cc76f0e2a7a003"
+            ]
+        ]
+    },
+    {
+        "id": "d0cc76f0e2a7a003",
+        "type": "http request",
+        "z": "7f6c3d67a0c8f001",
+        "name": "POST to Smart Home API",
+        "method": "POST",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://10.0.0.2:8000/api/v1/uplink",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 590,
+        "y": 300,
+        "wires": [
+            [
+                "be05f8ac34dea004"
+            ]
+        ]
+    },
+    {
+        "id": "be05f8ac34dea004",
+        "type": "debug",
+        "z": "7f6c3d67a0c8f001",
+        "name": "API response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload.status",
+        "statusType": "msg",
+        "x": 710,
+        "y": 380,
+        "wires": []
+    },
+    {
+        "id": "142a5ccb42b0b5a5",
+        "type": "mqtt in",
+        "z": "7f6c3d67a0c8f001",
+        "name": "",
+        "topic": "application/+/device/+/event/up",
+        "qos": "2",
+        "datatype": "auto-detect",
+        "broker": "6cbc9931d8775825",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 270,
+        "y": 120,
+        "wires": [
+            [
+                "735a7d5bcb94a002",
+                "7a109b3e4fc0dfa4"
+            ]
+        ]
+    },
+    {
+        "id": "7a109b3e4fc0dfa4",
+        "type": "debug",
+        "z": "7f6c3d67a0c8f001",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 560,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "6cbc9931d8775825",
+        "type": "mqtt-broker",
+        "name": "",
+        "broker": "${CHIRPSTACK-MQTT-HOST}",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    }
+]

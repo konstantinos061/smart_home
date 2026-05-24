@@ -1,182 +1,330 @@
-# 🌐 Smart Home IoT — Cloud Infrastructure
+# 🏠 Smart Home IoT Cloud Infrastructure
 
-A self-hosted IoT platform for monitoring and controlling the DTU Smart Home system, featuring a real-time React dashboard, FastAPI backend, and TimescaleDB for time-series data storage.
+This folder contains the cloud-side services for the LoRa-based Smart Home IoT
+system: a FastAPI backend, a React dashboard, a TimescaleDB database, and the
+deployment files needed to run them locally with Docker Compose.
+
+The cloud stack receives decoded LoRaWAN uplinks from ChirpStack through
+Node-RED, stores telemetry in PostgreSQL/TimescaleDB, serves the dashboard, and
+queues downlink commands back to devices through the ChirpStack REST API.
 
 ## Architecture
 
----ADD a photo here of the cloud infrastrutue from the lorawan gateway !!!!
+The cloud data path is split by traffic direction:
 
-### Backend (FastAPI)
-- REST API for node registration, telemetry ingestion, and downlink commands
-- Pydantic models for data validation
-- SQLAlchemy ORM with TimescaleDB for efficient time-series queries
-- Automatic API documentation at `/docs`
+- **Uplinks:** devices send telemetry through the LoRaWAN gateway and
+  ChirpStack. Node-RED subscribes to ChirpStack MQTT events, normalizes each
+  message, and forwards it to FastAPI as an HTTP request.
+- **Downlinks:** the dashboard sends commands to FastAPI. FastAPI encodes the
+  command payload and directly enqueues a Class C downlink in ChirpStack through
+  the ChirpStack REST API.
+- **Persistence:** FastAPI writes nodes, sensors, status events, and telemetry
+  to TimescaleDB.
+- **Visualization:** the React dashboard reads latest and historical telemetry
+  from FastAPI and receives real-time update notifications over WebSocket.
 
-### Middleware (Node-RED)
-- Subscribes to the ChirpStack MQTT broker
-- Forwards incoming uplink payloads to FastAPI via REST POST requests
-- Downlink commands bypass Node-RED entirely — FastAPI calls ChirpStack's REST API directly for low-latency Class C delivery
+<p align="center">
+  <img src="DataflowDiagram.png" alt="Cloud data flow" width="70%">
+</p>
 
-### Frontend (React + TypeScript)
-- Real-time dashboard with a card per node, grouped by device type
-- Interactive set-temperature controls for the thermostat
-- Historical data charts via Recharts
-- Battery level and signal strength (RSSI) indicators on every card
+## Services
 
-### Database (PostgreSQL + TimescaleDB)
-- Time-series optimised storage for all sensor telemetry
-- Relational tables for node registry and sensor metadata
-- Adminer web interface for direct database inspection
+| Component | Technology | Responsibility |
+|---|---|---|
+| Dashboard | React, TypeScript, Vite, Nginx | Browser UI for live monitoring, charts, sensor management, and commands |
+| API | FastAPI, Uvicorn, SQLAlchemy, Pydantic | Telemetry ingestion, validation, persistence, REST API, WebSocket updates, downlink encoding |
+| Database | PostgreSQL 16, TimescaleDB | Time-series telemetry and relational node/sensor metadata |
+| Database UI | Adminer | Direct database inspection during development |
+| Middleware | Node-RED | External flow that bridges ChirpStack MQTT uplinks into FastAPI HTTP ingestion |
+| Network server | ChirpStack | External LoRaWAN network server used for gateway/device registration and downlink queueing |
 
+The Docker Compose file in this folder starts the dashboard, API, database, and
+Adminer. ChirpStack and Node-RED are documented integration points rather than
+fully bundled services in this repository.
 
-## Dashboard
+## Dashboard Features
 
-The dashboard groups nodes into three sections based on device type:
+The dashboard groups sensors by device type and exposes controls appropriate to
+each node.
 
 ### 🌡️ Thermostats
-Each thermostat card shows:
-- **Current temperature** — large display, 0.1°C resolution
-- **Set temperature** — adjustable with − / + buttons and a Send control; precision 0.1°C; sends a downlink setpoint command to the node via ChirpStack
-- **Humidity** — current relative humidity (%)
-- **Status** — connection health indicator
-- **Last update** — timestamp of most recent uplink
-- **Battery** — percentage with visual bar
-- **Signal** — RSSI quality indicator
-- **History** — opens an interactive dual-axis chart of temperature and humidity over time
 
-### 🔒 Doors (Smart Lock)
-Each door card shows:
-- **HOMIES** — cumulative count of successful unlock events
-- **IMPOSTORS** — cumulative count of failed access attempts (wrong PIN or unrecognised card)
-- **Last updated** — timestamp of most recent uplink
-- **Battery** — percentage with visual bar
-- **Signal** — RSSI quality indicator
-- **History** — opens a chart of unlock and failed-attempt counts over time
+- Current temperature with 0.1 degree precision
+- Humidity
+- Current set temperature
+- Setpoint controls that send a `setTemperature` downlink through ChirpStack
+- Battery, RSSI, status, and last-update indicators
+- Historical temperature and humidity charts
 
-### 💡 Motion Sensors (Smart Light)
-Each motion sensor card shows:
-- **Motion state** — live indicator; highlights red with a walking-figure icon when motion is currently detected
-- **Counter** — cumulative motion event count since last uplink
-- **Last activity** — timestamp of the most recent PIR trigger
-- **Battery** — percentage with visual bar
-- **Signal** — RSSI quality indicator
-- **History** — opens a chart of motion events over time
+### 🔒 Door Locks
 
+- Successful unlock count
+- Failed access attempt count
+- Battery, RSSI, status, and last-update indicators
+- Historical access-attempt chart
+- Remote unlock command support through the backend command API
+
+### 💡 Motion Sensors
+
+- Live motion state
+- Motion event count
+- Last activity timestamp
+- Battery, RSSI, status, and last-update indicators
+- Historical motion chart
 
 ## Quick Start
 
 ### Prerequisites
+
 - Docker and Docker Compose
-- Python 3.10+ (for dummy data script)
+- Python 3.10+ if you want to run the optional data seeder
 
-### Run the Application
+### Start the Local Cloud Stack
+
+Run Docker Compose from this `Cloud/` directory:
+
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd smart_home
-
-# Start all services
+cd Cloud
 docker compose up --build
 ```
+
+The first build creates the backend image, builds the React dashboard, and starts
+TimescaleDB. FastAPI initializes the database schema on startup.
 
 ### Access Points
 
 | Service | URL |
 |---|---|
 | Dashboard | http://localhost |
-| API Documentation | http://localhost:8000/docs |
-| Database Admin (Adminer) | http://localhost:8081 |
-| Node-RED | http://10.0.0.1:1880 |
-| ChirpStack | http://10.0.0.1:8080 |
+| API documentation | http://localhost:8000/docs |
+| API health check | http://localhost:8000/api/v1/health |
+| Adminer | http://localhost:8081 |
+| PostgreSQL | `localhost:5433` |
 
-### Add Test Data
+Adminer database connection:
+
+| Field | Value |
+|---|---|
+| System | PostgreSQL |
+| Server | `postgres` when using Adminer, `localhost:5433` from the host |
+| Username | `postgres` |
+| Password | `postgres` |
+| Database | `postgres` |
+
+### Seed Test Data
+
+With the API running, seed sample telemetry from the `Cloud/` directory:
+
 ```bash
-python dummy-data.py
+python3 dummy-data.py
 ```
 
+This is only for local dashboard testing. Real telemetry should come from the
+Node-RED to FastAPI uplink flow.
+
+## ChirpStack and Node-RED Integration
+
+### ChirpStack
+
+ChirpStack is used as the LoRaWAN network server. In the project deployment it
+was hosted externally on Azure and used to register:
+
+- the LoRaWAN gateway
+- the gateway device EUI used by the local smart-home bridge
+- application/device profiles required for Class C downlinks
+
+The repository does not include the full ChirpStack Docker Compose setup because
+the official ChirpStack project already provides a reproducible starter stack:
+
+https://www.chirpstack.io/docs/getting-started/docker.html
+
+FastAPI queues downlinks through:
+
+```text
+POST {CHIRPSTACK_BASE_URL}/api/devices/{devEui}/queue
+```
+
+The backend reads these optional environment variables:
+
+| Variable | Purpose | Default in code |
+|---|---|---|
+| `CHIRPSTACK_BASE_URL` | Base URL for the ChirpStack API | `http://10.0.0.1:8090` |
+| `CHIRPSTACK_API_TOKEN` | Bearer token used for queue API calls | Development token in `app/services/chirpstack.py` |
+
+For a real deployment, pass these values through environment variables or a
+secret manager instead of relying on source-code defaults.
+
+### Node-RED
+
+Node-RED owns the long-running ChirpStack MQTT subscription for uplinks. The
+exported flow is included at:
+
+```text
+nodered/flows.json
+```
+
+The flow should be imported into the Node-RED instance connected to the
+ChirpStack MQTT broker. Its output is an HTTP POST to the FastAPI uplink
+endpoint:
+
+```text
+POST /api/v1/uplink
+```
+
+Downlinks intentionally bypass Node-RED. This keeps command latency low and
+keeps command encoding in the backend where the dashboard API already runs.
 
 ## API Reference
 
-### Core Endpoints
-- `GET /api/v1/node/latest` — get all nodes with their latest telemetry
-- `POST /api/v1/uplink` — ingest sensor data from Node-RED
-- `GET /api/v1/telemetry` — query historical telemetry
-- `POST /api/v1/node` — register a new node
+Interactive OpenAPI documentation is available at:
 
-### Example: Get Latest Data
+```text
+http://localhost:8000/docs
+```
+
+Core endpoints:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/v1/health` | Check API and database connectivity |
+| `POST` | `/api/v1/node` | Register or update a node |
+| `POST` | `/api/v1/node/status` | Ingest node status events |
+| `GET` | `/api/v1/node/latest` | Return all nodes with latest telemetry and status |
+| `POST` | `/api/v1/uplink` | Ingest a ChirpStack-style base64 payload |
+| `GET` | `/api/v1/telemetry` | Query historical telemetry |
+| `GET` | `/api/v1/sensors` | List registered sensors |
+| `POST` | `/api/v1/sensors` | Register a sensor and notify the gateway |
+| `POST` | `/api/v1/sensors/{sensor_id}/name` | Rename a sensor |
+| `POST` | `/api/v1/sensors/{sensor_id}/delete` | Delete a sensor and its telemetry |
+| `POST` | `/api/v1/nodes/{node_id}/commands` | Encode and enqueue a downlink command |
+| `WS` | `/api/v1/ws` | Dashboard real-time update channel |
+
+### Example: Read Latest Node State
+
 ```bash
 curl http://localhost:8000/api/v1/node/latest
 ```
 
-### Example: Send Telemetry
+### Example: Ingest an Uplink
+
+The backend expects the same shape as a ChirpStack uplink event after Node-RED
+normalization. The `data` field is a base64-encoded binary sensor record.
+
 ```bash
 curl -X POST http://localhost:8000/api/v1/uplink \
   -H 'Content-Type: application/json' \
   -d '{
-    "nodeId": "living-room",
-    "measurements": [
+    "nodeId": "0004a30b01101ede",
+    "timestamp": "2026-05-24T12:00:00.000Z",
+    "data": "IAAA4TEA4VU=",
+    "metadata": {
+      "source": "manual-test"
+    },
+    "rxInfo": [
       {
-        "sensorId": 1,
-        "sensorType": "thermostat",
-        "key": "temperature",
-        "value": 22.5,
-        "batteryPct": 85
+        "rssi": -78,
+        "snr": 7.5
       }
     ]
   }'
 ```
 
+### Example: Send a Thermostat Setpoint
 
-## Development
+```bash
+curl -X POST http://localhost:8000/api/v1/nodes/0004a30b01101ede/commands \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "commandType": "setTemperature",
+    "confirmed": true,
+    "flushQueue": false,
+    "payload": {
+      "sensorId": 32,
+      "value": 22.5
+    }
+  }'
+```
 
-### Backend Setup
+Supported command types in the backend:
+
+| Command | Payload | Notes |
+|---|---|---|
+| `setTemperature` | `{ "sensorId": 32-63, "value": 22.5 }` | Encodes a thermostat setpoint downlink |
+| `openDoor` | `{ "sensorId": 64-95 }` | Encodes an encrypted door unlock command |
+| `addSensor` | `{ "sensorId": 32-95, "addCommand": true }` | Sends a gateway sensor registration command |
+
+## Local Development
+
+The Docker Compose setup is the simplest way to run all local services. You can
+also run backend or frontend directly while using the Compose database.
+
+### Backend
+
 ```bash
 cd Cloud
 python3 -m pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-### Frontend Setup
+When running the backend outside Docker, configure the database URL for the host
+port:
+
 ```bash
-cd frontend
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5433/postgres
+```
+
+### Frontend
+
+```bash
+cd Cloud/frontend
 npm install
 npm run dev
 ```
 
-### Database Access
-- Host: `localhost:5433`
-- User: `postgres`
-- Password: `postgres`
-- Database: `postgres`
+The Vite dev server runs on:
 
+```text
+http://localhost:5173
+```
+
+By default, the frontend uses relative `/api/...` paths. For direct development
+against a separately hosted backend, set:
+
+```bash
+export VITE_API_URL=http://localhost:8000
+```
 
 ## Project Structure
 
-```
+```text
 Cloud/
 ├── app/                    # FastAPI backend
-│   ├── api/
-│   ├── models/
-│   ├── schemas/
-│   └── services/
-├── frontend/               # React dashboard
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   └── services/
-│   └── package.json
-├── docker-compose.yml      # Container orchestration
-├── dummy-data.py           # Test data generator
+│   ├── api/                # Routes and dependencies
+│   ├── models/             # SQLAlchemy models
+│   ├── schemas/            # Pydantic request/response schemas
+│   └── services/           # Payload decoding, downlink encoding, ChirpStack client
+├── frontend/               # React + TypeScript dashboard
+│   ├── public/
+│   └── src/
+│       ├── components/
+│       ├── pages/
+│       └── services/
+├── nodered/
+│   └── flows.json          # Exported Node-RED uplink bridge flow
+├── DataflowDiagram.png
+├── docker-compose.yml      # Local API/frontend/database/Adminer orchestration
+├── Dockerfile              # FastAPI image
+├── dummy-data.py           # Optional local telemetry seeder
+├── requirements.txt
 └── README.md
 ```
 
-
-## Technologies
+## Technology Stack
 
 | Layer | Stack |
 |---|---|
-| Backend | FastAPI 0.115.0, SQLAlchemy 2.0.35, Pydantic 2.9.2 |
-| Frontend | React 19.2.5, TypeScript 6.0.2, Recharts 3.8.1 |
+| Backend | FastAPI, Uvicorn, SQLAlchemy, Pydantic, Requests |
+| Frontend | React, TypeScript, Vite, Recharts, Axios |
 | Database | PostgreSQL 16, TimescaleDB |
-| Middleware | Node-RED, Mosquitto MQTT |
-| Infrastructure | Docker, Docker Compose, Adminer |
+| Integration | ChirpStack, Node-RED, MQTT |
+| Infrastructure | Docker, Docker Compose, Nginx, Adminer |
