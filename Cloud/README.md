@@ -253,47 +253,6 @@ Supported command types in the backend:
 | `openDoor` | `{ "sensorId": 64-95 }` | Encodes an encrypted door unlock command |
 | `addSensor` | `{ "sensorId": 32-95, "addCommand": true }` | Sends a gateway sensor registration command |
 
-## Local Development
-
-The Docker Compose setup is the simplest way to run all local services. You can
-also run backend or frontend directly while using the Compose database.
-
-### Backend
-
-```bash
-cd Cloud
-python3 -m pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-When running the backend outside Docker, configure the database URL for the host
-port:
-
-```bash
-export DATABASE_URL=postgresql://postgres:postgres@localhost:5433/postgres
-```
-
-### Frontend
-
-```bash
-cd Cloud/frontend
-npm install
-npm run dev
-```
-
-The Vite dev server runs on:
-
-```text
-http://localhost:5173
-```
-
-By default, the frontend uses relative `/api/...` paths. For direct development
-against a separately hosted backend, set:
-
-```bash
-export VITE_API_URL=http://localhost:8000
-```
-
 ## Project Structure
 
 ```text
