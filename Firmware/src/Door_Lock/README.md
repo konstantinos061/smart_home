@@ -56,7 +56,7 @@ Access control is implemented as a two-factor finite state machine:
 
 The node accepts encrypted downlink commands from the gateway. All commands use **AES-GCM (128-bit)** with a Pre-Shared Key stored in the ESP32's non-volatile memory, never transmitted over the air.
 
-The downlink packet is **10 bytes**:
+The downlink payload is **10 bytes**:
 
 | Bytes | Field | Description |
 |---|---|---|
